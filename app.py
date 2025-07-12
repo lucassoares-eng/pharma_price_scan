@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Blueprint
 from scrapers.droga_raia import DrogaRaiaScraper
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -8,8 +8,6 @@ import platform
 
 # Importar funções do base_scraper
 from scrapers.base_scraper import get_chrome_version, get_chromedriver_url, update_chromedriver, get_os_type
-
-app = Flask(__name__)
 
 # Variável global para o driver
 global_driver = None
@@ -92,12 +90,10 @@ def cleanup_global_driver():
         global_driver = None
         print("Driver global encerrado")
 
-@app.route('/')
-def index():
-    """Página principal com interface para busca de medicamentos"""
-    return render_template('index.html')
+# Criar blueprint para as rotas da API
+pharma_api = Blueprint('pharma_api', __name__, url_prefix='/api/pharma')
 
-@app.route('/api/search', methods=['POST'])
+@pharma_api.route('/search', methods=['POST'])
 def search_medicines():
     """API endpoint para buscar medicamentos em diferentes farmácias"""
     try:
@@ -136,7 +132,7 @@ def search_medicines():
     except Exception as e:
         return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
 
-@app.route('/api/health', methods=['GET'])
+@pharma_api.route('/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar se o driver está funcionando"""
     try:
@@ -147,17 +143,65 @@ def health_check():
     except Exception as e:
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
-if __name__ == '__main__':
+# Criar blueprint para as rotas da interface web
+pharma_web = Blueprint('pharma_web', __name__)
+
+@pharma_web.route('/')
+def index():
+    """Página principal com interface para busca de medicamentos"""
+    return render_template('index.html')
+
+# Função para criar a aplicação Flask
+def create_app(config=None):
+    """Factory function para criar a aplicação Flask"""
+    app = Flask(__name__)
+    
+    # Configurar a aplicação
+    if config:
+        app.config.update(config)
+    
+    # Registrar blueprints
+    app.register_blueprint(pharma_api)
+    app.register_blueprint(pharma_web)
+    
+    # Configurar limpeza do driver ao encerrar
+    import atexit
+    atexit.register(cleanup_global_driver)
+    
+    return app
+
+# Função para inicializar o driver global
+def init_driver():
+    """Inicializa o driver global"""
+    try:
+        setup_global_driver()
+        print("Driver global inicializado com sucesso")
+        return True
+    except Exception as e:
+        print(f"Erro ao inicializar driver: {e}")
+        return False
+
+# Função para obter os blueprints (útil para integração)
+def get_blueprints():
+    """Retorna os blueprints para integração em outras aplicações"""
+    return [pharma_api, pharma_web]
+
+def main():
+    """Função principal para execução standalone"""
     try:
         # Inicializar driver global
-        setup_global_driver()
-        print("Aplicação iniciada com driver global configurado")
-        
-        # Registrar função de limpeza para ser executada ao encerrar
-        import atexit
-        atexit.register(cleanup_global_driver)
-        
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        if init_driver():
+            print("Aplicação iniciada com driver global configurado")
+            
+            # Criar e executar a aplicação
+            app = create_app()
+            app.run(debug=True, host='0.0.0.0', port=5000)
+        else:
+            print("Falha ao inicializar driver. Encerrando aplicação.")
     except Exception as e:
         print(f"Erro ao inicializar aplicação: {e}")
-        cleanup_global_driver() 
+        cleanup_global_driver()
+
+# Aplicação standalone (para uso direto)
+if __name__ == '__main__':
+    main() 

@@ -9,13 +9,16 @@ Sistema de busca de preços de medicamentos em diferentes farmácias usando web 
 - **Múltiplas Farmácias**: Suporte para múltiplas farmácias com scrapers independentes
 - **Interface Web**: Interface simples para busca de medicamentos
 - **API REST**: Endpoint para busca programática
+- **Arquitetura Modular**: Blueprints Flask para fácil integração em outras aplicações
 
 ## Estrutura do Projeto
 
 ```
 pharma_price_scan/
-├── app.py                 # Aplicação Flask principal
+├── app.py                 # Aplicação Flask principal com blueprints
 ├── requirements.txt       # Dependências Python
+├── integration_example.py # Exemplo de integração em outras apps
+├── pharma_integration.py # Módulo de integração facilitada
 ├── scrapers/
 │   ├── __init__.py
 │   ├── base_scraper.py   # Classe base para todos os scrapers
@@ -48,7 +51,7 @@ pip install -r requirements.txt
 
 ## Uso
 
-### Executar a Aplicação
+### Executar a Aplicação Standalone
 
 ```bash
 python app.py
@@ -59,15 +62,99 @@ A aplicação estará disponível em `http://localhost:5000`
 ### Endpoints Disponíveis
 
 - `GET /`: Interface web para busca de medicamentos
-- `POST /api/search`: API para busca de medicamentos
-- `GET /api/health`: Verificar status do driver
+- `POST /api/pharma/search`: API para busca de medicamentos
+- `GET /api/pharma/health`: Verificar status do driver
 
 ### Exemplo de Uso da API
 
 ```bash
-curl -X POST http://localhost:5000/api/search \
+curl -X POST http://localhost:5000/api/pharma/search \
   -H "Content-Type: application/json" \
   -d '{"medicine_description": "paracetamol"}'
+```
+
+## Integração em Outras Aplicações Flask
+
+### Método 1: Integração Simples
+
+```python
+from flask import Flask
+from pharma_integration import integrate_pharma_scanner
+
+app = Flask(__name__)
+
+# Integrar o Pharma Scanner
+integration = integrate_pharma_scanner(app)
+
+# Suas rotas existentes
+@app.route('/')
+def home():
+    return "Minha aplicação"
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+### Método 2: Integração com Prefixo Personalizado
+
+```python
+from flask import Flask
+from pharma_integration import integrate_pharma_scanner
+
+app = Flask(__name__)
+
+# Integrar com prefixo personalizado
+integration = integrate_pharma_scanner(app, url_prefix='/medicines')
+
+# Agora os endpoints estarão em:
+# - /medicines/api/pharma/search
+# - /medicines/api/pharma/health
+# - /medicines/ (interface web)
+```
+
+### Método 3: Integração Manual
+
+```python
+from flask import Flask
+from app import get_blueprints, init_driver, cleanup_global_driver
+import atexit
+
+app = Flask(__name__)
+
+# Inicializar driver
+if init_driver():
+    # Registrar blueprints
+    pharma_blueprints = get_blueprints()
+    for blueprint in pharma_blueprints:
+        app.register_blueprint(blueprint)
+    
+    # Configurar limpeza
+    atexit.register(cleanup_global_driver)
+
+# Suas rotas
+@app.route('/')
+def home():
+    return "Minha aplicação"
+```
+
+### Método 4: Usando a Classe de Integração
+
+```python
+from flask import Flask
+from pharma_integration import PharmaScannerIntegration
+
+app = Flask(__name__)
+
+# Criar integração
+integration = PharmaScannerIntegration(app)
+
+# Registrar blueprints quando necessário
+integration.register_blueprints(url_prefix='/pharma')
+
+# Suas rotas
+@app.route('/')
+def home():
+    return "Minha aplicação"
 ```
 
 ## Adicionando Novos Scrapers
@@ -139,6 +226,17 @@ O sistema automaticamente:
 2. Baixa o ChromeDriver compatível se necessário
 3. Usa fallback para ChromeDriverManager se houver problemas
 4. Configura o driver com opções otimizadas para web scraping
+
+## Blueprints Disponíveis
+
+O sistema expõe dois blueprints principais:
+
+### `pharma_api` (API REST)
+- `POST /search`: Busca medicamentos
+- `GET /health`: Verificar status do driver
+
+### `pharma_web` (Interface Web)
+- `GET /`: Interface web para busca
 
 ## Logs e Debugging
 
