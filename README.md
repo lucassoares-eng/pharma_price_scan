@@ -10,6 +10,7 @@ Sistema de busca de preços de medicamentos em diferentes farmácias usando web 
 - **Interface Web**: Interface simples para busca de medicamentos
 - **API REST**: Endpoint para busca programática
 - **Arquitetura Modular**: Blueprints Flask para fácil integração em outras aplicações
+- **Arquivos Estáticos Organizados**: CSS e JavaScript separados em arquivos independentes
 
 ## Estrutura do Projeto
 
@@ -19,11 +20,17 @@ pharma_price_scan/
 ├── requirements.txt       # Dependências Python
 ├── integration_example.py # Exemplo de integração em outras apps
 ├── pharma_integration.py # Módulo de integração facilitada
+├── setup.py              # Configuração para instalação como pacote
 ├── scrapers/
 │   ├── __init__.py
 │   ├── base_scraper.py   # Classe base para todos os scrapers
 │   ├── droga_raia.py     # Scraper para Droga Raia
 │   └── example_scraper.py # Exemplo de novo scraper
+├── static/
+│   ├── css/
+│   │   └── style.css     # Estilos CSS da aplicação
+│   └── js/
+│       └── app.js        # JavaScript da aplicação
 └── templates/
     └── index.html         # Interface web
 ```
@@ -237,6 +244,19 @@ O sistema expõe dois blueprints principais:
 
 ### `pharma_web` (Interface Web)
 - `GET /`: Interface web para busca
+
+## Arquivos Estáticos
+
+### CSS (`static/css/style.css`)
+- Estilos responsivos e modernos
+- Gradientes e animações
+- Componentes personalizados para cards, gráficos e estatísticas
+
+### JavaScript (`static/js/app.js`)
+- Lógica de busca e exibição de resultados
+- Criação e interação com gráficos Chart.js
+- Análise comparativa de preços
+- Gerenciamento de estado da aplicação
 
 ## Logs e Debugging
 
