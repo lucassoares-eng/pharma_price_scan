@@ -81,15 +81,7 @@ function displayResults(data) {
                 </div>
             </div>
         </div>
-        
-        <!-- Gráfico de Preços por Marca -->
-        <div class="chart-container mt-4" id="priceChartSection" style="display: none;">
-            <h5><i class="fas fa-chart-bar me-2"></i>Preços por Marca (Menor para Maior)</h5>
-            <div class="chart-wrapper">
-                <canvas id="priceChart"></canvas>
-            </div>
-        </div>
-        
+
         <!-- Seletor de Marca -->
         <div class="product-selector" id="brandSelector" style="display: none;">
             <h4><i class="fas fa-tags me-2"></i>Selecionar Marca para Análise</h4>
@@ -102,6 +94,15 @@ function displayResults(data) {
                 </div>
             </div>
         </div>
+        
+        <!-- Gráfico de Preços por Marca -->
+        <div class="chart-container mt-4" id="priceChartSection" style="display: none;">
+            <h5><i class="fas fa-chart-bar me-2"></i>Preços por Marca (Menor para Maior)</h5>
+            <div class="chart-wrapper">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+        
         
         <!-- Análise Comparativa da Marca Selecionada -->
         <div class="comparison-highlight" id="comparisonSection" style="display: none;">
@@ -299,25 +300,30 @@ function createPriceChart() {
             ctx.save();
             chart.getDatasetMeta(0).data.forEach((bar, i) => {
                 const discount = dataset.discounts[i];
+                const price = dataset.data[i];
+                const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
+                ctx.font = 'bold 16px Segoe UI, Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Calcular o centro da barra horizontal
+                const barStart = chart.scales.x.left;
+                const centerX = barStart + (bar.x - barStart) / 2;
+                let textX = centerX;
+                let textY = bar.y;
+                // Cor do preço: preto se barra selecionada, branco caso contrário
+                let isSelected = selectedProduct && chart.data.labels[i] === selectedProduct.brand;
+                ctx.fillStyle = isSelected ? '#222' : '#fff';
+                ctx.fillText(priceLabel, textX, textY);
+                const priceWidth = ctx.measureText(priceLabel).width;
                 if (discount) {
-                    // Posição do preço (label)
-                    const price = dataset.data[i];
-                    const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
-                    ctx.font = 'bold 16px Segoe UI, Arial';
-                    const priceWidth = ctx.measureText(priceLabel).width;
-
-                    // Badge
+                    // Badge imediatamente ao lado direito do texto centralizado
                     const badgeWidth = 48, badgeHeight = 24;
-                    // Badge imediatamente à direita do preço
-                    let x = bar.x + priceWidth / 2;
-                    // Centralizar verticalmente ao texto do preço
-                    let y = bar.y - badgeHeight / 2;
-
-                    // Se badge sair do gráfico, trave na borda direita
+                    let x = textX + priceWidth / 2 + 8;
+                    let y = textY - badgeHeight / 2;
                     if (x + badgeWidth > chart.chartArea.right - 8) {
                         x = chart.chartArea.right - badgeWidth - 8;
                     }
-                    ctx.fillStyle = '#dc3545'; // vermelho sólido Bootstrap
+                    ctx.fillStyle = '#dc3545';
                     ctx.beginPath();
                     ctx.moveTo(x + 6, y);
                     ctx.lineTo(x + badgeWidth - 6, y);
@@ -348,11 +354,15 @@ function createPriceChart() {
             datasets: [{
                 label: 'Preço Médio (R$)',
                 data: sortedBrands.map(b => b.avgPrice),
-                backgroundColor: sortedBrands.map(b => 
-                    selectedProduct && b.brand === selectedProduct.brand ? '#ff6b6b' : '#667eea'
+                backgroundColor: sortedBrands.map(b =>
+                    selectedProduct
+                        ? (b.brand === selectedProduct.brand ? '#ffe4e1' : '#a3bffa')
+                        : '#667eea'
                 ),
-                borderColor: sortedBrands.map(b => 
-                    selectedProduct && b.brand === selectedProduct.brand ? '#ff6b6b' : '#667eea'
+                borderColor: sortedBrands.map(b =>
+                    selectedProduct
+                        ? (b.brand === selectedProduct.brand ? '#c0392b' : '#a3bffa')
+                        : '#667eea'
                 ),
                 borderWidth: 1,
                 discounts: sortedBrands.map(b => {
@@ -369,18 +379,7 @@ function createPriceChart() {
             maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                datalabels: {
-                    anchor: 'center',
-                    align: 'center',
-                    color: '#fff',
-                    font: { weight: 'bold', size: 16 },
-                    formatter: function(value, context) {
-                        // Só o preço, sem desconto
-                        return `R$ ${value.toFixed(2).replace('.', ',')}`;
-                    },
-                    display: true,
-                    clip: false
-                },
+                datalabels: { display: false }, // Desabilita ChartDataLabels
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -399,7 +398,7 @@ function createPriceChart() {
                 }
             }
         },
-        plugins: [ChartDataLabels, descontoBadgePlugin]
+        plugins: [descontoBadgePlugin]
     });
     
     // Após criar o gráfico priceChart
@@ -409,10 +408,18 @@ function createPriceChart() {
             const index = points[0].index;
             const brand = priceChart.data.labels[index];
             const brandSelect = document.getElementById('brandSelect');
-            brandSelect.value = brand;
-            // Disparar o evento de change para atualizar análise
-            const event = new Event('change', { bubbles: true });
-            brandSelect.dispatchEvent(event);
+            // Se já está selecionada, deseleciona
+            if (selectedProduct && selectedProduct.brand === brand) {
+                brandSelect.value = '';
+                selectedProduct = null;
+                updatePriceChart();
+                document.getElementById('comparisonSection').style.display = 'none';
+            } else {
+                brandSelect.value = brand;
+                // Disparar o evento de change para atualizar análise
+                const event = new Event('change', { bubbles: true });
+                brandSelect.dispatchEvent(event);
+            }
         }
     };
 
@@ -450,6 +457,10 @@ function showBrandSelector() {
             selectedProduct = null;
             updatePriceChart();
             document.getElementById('comparisonSection').style.display = 'none';
+            // Remover destaque na lista Droga Raia
+            document.querySelectorAll('.product-card.destaque-droga-raia').forEach(el => {
+                el.classList.remove('destaque-droga-raia');
+            });
         }
     });
     
@@ -484,12 +495,22 @@ function updatePriceChart() {
         priceChart.data.labels = sortedBrands.map(b => b.brand);
         priceChart.data.datasets[0].data = sortedBrands.map(b => b.avgPrice);
         priceChart.data.datasets[0].backgroundColor = sortedBrands.map(b => 
-            selectedProduct && b.brand === selectedProduct.brand ? '#ff6b6b' : '#667eea'
+            selectedProduct
+                ? (b.brand === selectedProduct.brand ? '#ffe4e1' : '#a3bffa')
+                : '#667eea'
         );
         priceChart.data.datasets[0].borderColor = sortedBrands.map(b => 
-            selectedProduct && b.brand === selectedProduct.brand ? '#ff6b6b' : '#667eea'
+            selectedProduct
+                ? (b.brand === selectedProduct.brand ? '#c0392b' : '#a3bffa')
+                : '#667eea'
         );
         priceChart.update();
+    }
+    // Sempre remover destaque da lista Droga Raia ao atualizar gráfico sem seleção
+    if (!selectedProduct) {
+        document.querySelectorAll('.product-card.destaque-droga-raia').forEach(el => {
+            el.classList.remove('destaque-droga-raia');
+        });
     }
 }
 
