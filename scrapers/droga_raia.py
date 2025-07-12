@@ -9,11 +9,12 @@ logger = logging.getLogger("DrogaRaiaScraper")
 class DrogaRaiaScraper(BaseScraper):
     """Scraper para o site Droga Raia usando Selenium"""
     
-    def __init__(self):
+    def __init__(self, driver=None):
         super().__init__(
             base_url="https://www.drogaraia.com.br",
             search_url="https://www.drogaraia.com.br/search",
-            pharmacy_name="Droga Raia"
+            pharmacy_name="Droga Raia",
+            driver=driver
         )
     
     def search(self, medicine_description):
@@ -40,15 +41,19 @@ class DrogaRaiaScraper(BaseScraper):
             # Extrair produtos
             products = self._extract_products(soup)
             self.logger.info(f"Produtos encontrados: {len(products)}")
+
+            # Ordenar produtos do menor para o maior preço
+            products = sorted(
+                products,
+                key=lambda p: p['price'] if isinstance(p['price'], (int, float)) else float('inf')
+            )
             
             return self.format_response(products, url)
             
         except Exception as e:
             self.logger.error(f"Erro inesperado: {e}")
             return self.format_response([], "", f'Erro inesperado: {str(e)}')
-        finally:
-            # Limpar recursos
-            self.cleanup()
+        # Removido o finally que limpava o driver, já que agora é compartilhado
     
     def _extract_products(self, soup):
         """

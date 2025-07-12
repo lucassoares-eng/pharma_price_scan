@@ -1,11 +1,96 @@
 from flask import Flask, render_template, request, jsonify
-import requests
-from bs4 import BeautifulSoup
-import re
 from scrapers.droga_raia import DrogaRaiaScraper
-import json
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+import os
+import platform
+
+# Importar funções do base_scraper
+from scrapers.base_scraper import get_chrome_version, get_chromedriver_url, update_chromedriver, get_os_type
 
 app = Flask(__name__)
+
+# Variável global para o driver
+global_driver = None
+
+def setup_global_driver():
+    """Configura o driver global do Selenium"""
+    global global_driver
+    
+    try:
+        # Verificar se o ChromeDriver está atualizado
+        chrome_version = get_chrome_version()
+        print(f"Versão do Chrome detectada: {chrome_version}")
+        
+        # Tentar obter URL do ChromeDriver
+        try:
+            chromedriver_url = get_chromedriver_url(chrome_version)
+            print(f"URL do ChromeDriver: {chromedriver_url}")
+            
+            # Atualizar ChromeDriver se necessário
+            CHROMEDRIVER_DIR = os.path.join(os.getcwd(), "chromedriver_bin")
+            chromedriver_path = os.path.join(CHROMEDRIVER_DIR, "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+            
+            if not os.path.exists(chromedriver_path):
+                print("ChromeDriver não encontrado. Baixando...")
+                update_chromedriver(chromedriver_url)
+            
+        except Exception as e:
+            print(f"Erro ao obter ChromeDriver: {e}")
+            print("Usando ChromeDriverManager como fallback...")
+        
+        # Configurar opções do Chrome
+        chrome_options = Options()
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--window-size=1920,1080")
+        
+        # Inicializar o driver
+        try:
+            # Tentar usar ChromeDriver local primeiro
+            if os.path.exists(chromedriver_path):
+                service = Service(chromedriver_path)
+                global_driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("Driver inicializado com ChromeDriver local")
+            else:
+                # Fallback para ChromeDriverManager
+                from webdriver_manager.chrome import ChromeDriverManager
+                service = Service(ChromeDriverManager().install())
+                global_driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("Driver inicializado com ChromeDriverManager")
+                
+        except Exception as e:
+            print(f"Erro ao inicializar driver: {e}")
+            raise Exception(f"Não foi possível inicializar o ChromeDriver: {e}")
+        
+        # Executar script para remover propriedades de automação
+        global_driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        print("Driver global configurado com sucesso")
+        
+    except Exception as e:
+        print(f"Erro na configuração do driver: {e}")
+        raise e
+
+def get_global_driver():
+    """Retorna o driver global"""
+    global global_driver
+    if global_driver is None:
+        setup_global_driver()
+    return global_driver
+
+def cleanup_global_driver():
+    """Limpa o driver global"""
+    global global_driver
+    if global_driver:
+        global_driver.quit()
+        global_driver = None
+        print("Driver global encerrado")
 
 @app.route('/')
 def index():
@@ -22,9 +107,12 @@ def search_medicines():
         if not medicine_description:
             return jsonify({'error': 'Descrição do medicamento é obrigatória'}), 400
         
+        # Obter driver global
+        driver = get_global_driver()
+        
         # Lista de scrapers disponíveis
         scrapers = {
-            'droga_raia': DrogaRaiaScraper()
+            'droga_raia': DrogaRaiaScraper(driver=driver)
         }
         
         results = {}
@@ -48,5 +136,28 @@ def search_medicines():
     except Exception as e:
         return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Endpoint para verificar se o driver está funcionando"""
+    try:
+        driver = get_global_driver()
+        # Testar se o driver está respondendo
+        driver.current_url
+        return jsonify({'status': 'healthy', 'driver': 'active'})
+    except Exception as e:
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    try:
+        # Inicializar driver global
+        setup_global_driver()
+        print("Aplicação iniciada com driver global configurado")
+        
+        # Registrar função de limpeza para ser executada ao encerrar
+        import atexit
+        atexit.register(cleanup_global_driver)
+        
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    except Exception as e:
+        print(f"Erro ao inicializar aplicação: {e}")
+        cleanup_global_driver() 

@@ -18,7 +18,7 @@ import zipfile
 class BaseScraper(ABC):
     """Classe base para todos os scrapers de farmácias usando Selenium"""
     
-    def __init__(self, base_url, search_url, pharmacy_name):
+    def __init__(self, base_url, search_url, pharmacy_name, driver=None):
         """
         Inicializa o scraper base
         
@@ -26,15 +26,21 @@ class BaseScraper(ABC):
             base_url (str): URL base da farmácia
             search_url (str): URL de busca da farmácia
             pharmacy_name (str): Nome da farmácia
+            driver (webdriver, optional): Driver Selenium externo para reutilização
         """
         self.base_url = base_url
         self.search_url = search_url
         self.pharmacy_name = pharmacy_name
-        self.driver = None
+        self.driver = driver
         self.logger = logging.getLogger(self.__class__.__name__)
+        self._owns_driver = driver is None  # Indica se este scraper é responsável por limpar o driver
     
     def _setup_driver(self):
         """Configura o driver do Chrome com opções para evitar detecção"""
+        if self.driver is not None:
+            self.logger.info("Driver já configurado, reutilizando...")
+            return
+            
         chrome_options = Options()
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
@@ -202,10 +208,11 @@ class BaseScraper(ABC):
         }
     
     def cleanup(self):
-        """Limpa recursos do driver"""
-        if self.driver:
+        """Limpa recursos do driver apenas se for o proprietário"""
+        if self.driver and self._owns_driver:
             self.driver.quit()
-            self.driver = None 
+            self.driver = None
+            self.logger.info("Driver encerrado pelo scraper")
 
 # ChromeDriver Management
 
