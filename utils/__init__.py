@@ -1,0 +1,1 @@
+# Utilitários do projeto pharma_price_scan 

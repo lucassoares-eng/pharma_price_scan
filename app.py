@@ -10,6 +10,9 @@ import platform
 # Importar funções do base_scraper
 from scrapers.base_scraper import get_chrome_version, get_chromedriver_url, update_chromedriver, get_os_type
 
+# Importar o unificador de produtos
+from utils.product_unifier import unify_pharmacy_results
+
 # Variável global para o driver
 global_driver = None
 
@@ -147,10 +150,70 @@ def search_medicines():
                     }
                     break
         
+        # Unificar produtos semelhantes
+        unified_results = unify_pharmacy_results(results, similarity_threshold=0.7)
+        
         return jsonify({
             'medicine_description': medicine_description,
-            'results': results
+            'results': results,
+            'unified_results': unified_results
         })
+        
+    except Exception as e:
+        return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
+
+@pharma_api.route('/search_unified', methods=['POST'])
+def search_medicines_unified():
+    """API endpoint para buscar medicamentos e retornar apenas resultados unificados"""
+    try:
+        data = request.get_json()
+        medicine_description = data.get('medicine_description', '').strip()
+        
+        if not medicine_description:
+            return jsonify({'error': 'Descrição do medicamento é obrigatória'}), 400
+        
+        # Obter driver global
+        driver = get_global_driver()
+        
+        # Lista de scrapers disponíveis
+        scrapers = {
+            'droga_raia': DrogaRaiaScraper(driver=driver),
+            'sao_joao': SaoJoaoScraper(driver=driver)
+        }
+        
+        results = {}
+        
+        # Executar busca em cada farmácia
+        for pharmacy_name, scraper in scrapers.items():
+            tried_restart = False
+            while True:
+                try:
+                    pharmacy_results = scraper.search(medicine_description)
+                    results[pharmacy_name] = pharmacy_results
+                    break
+                except Exception as e:
+                    error_msg = str(e)
+                    if (not tried_restart) and ('invalid session id' in error_msg.lower()):
+                        # Reiniciar driver global e tentar novamente uma vez
+                        cleanup_global_driver()
+                        setup_global_driver()
+                        # Recriar o scraper específico
+                        if pharmacy_name == 'droga_raia':
+                            scrapers[pharmacy_name] = DrogaRaiaScraper(driver=get_global_driver())
+                        elif pharmacy_name == 'sao_joao':
+                            scrapers[pharmacy_name] = SaoJoaoScraper(driver=get_global_driver())
+                        tried_restart = True
+                        continue
+                    results[pharmacy_name] = {
+                        'error': f'Erro ao buscar em {pharmacy_name}: {error_msg}',
+                        'products': []
+                    }
+                    break
+        
+        # Unificar produtos semelhantes
+        unified_results = unify_pharmacy_results(results, similarity_threshold=0.7)
+        
+        return jsonify(unified_results)
         
     except Exception as e:
         return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500

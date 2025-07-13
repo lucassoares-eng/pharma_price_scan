@@ -206,4 +206,5 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 *_debug.html
-*_test_result.json
+*_result.json
+*_results.json
