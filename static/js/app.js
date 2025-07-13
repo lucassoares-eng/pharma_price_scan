@@ -13,7 +13,14 @@ window.descontoBadgePlugin = {
             const discount = dataset.discounts[i];
             const price = dataset.data[i];
             const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
-            ctx.font = 'bold 16px Segoe UI, Arial';
+            // --- Ajuste responsivo da fonte do preço ---
+            let priceFont = 'bold 16px Segoe UI, Arial';
+            if (window.innerWidth < 576) {
+                priceFont = 'bold 12px Segoe UI, Arial';
+            } else if (window.innerWidth < 992) {
+                priceFont = 'bold 14px Segoe UI, Arial';
+            }
+            ctx.font = priceFont;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             // Calcular o centro da barra horizontal
@@ -27,8 +34,18 @@ window.descontoBadgePlugin = {
             ctx.fillText(priceLabel, textX, textY);
             const priceWidth = ctx.measureText(priceLabel).width;
             if (discount) {
+                // --- Ajuste responsivo do badge ---
+                let badgeWidth = 48, badgeHeight = 24, badgeFont = 'bold 14px Segoe UI, Arial';
+                if (window.innerWidth < 576) {
+                    badgeWidth = 34;
+                    badgeHeight = 18;
+                    badgeFont = 'bold 11px Segoe UI, Arial';
+                } else if (window.innerWidth < 992) {
+                    badgeWidth = 40;
+                    badgeHeight = 20;
+                    badgeFont = 'bold 12px Segoe UI, Arial';
+                }
                 // Badge imediatamente ao lado direito do texto centralizado
-                const badgeWidth = 48, badgeHeight = 24;
                 let x = textX + priceWidth / 2 + 8;
                 let y = textY - badgeHeight / 2;
                 if (x + badgeWidth > chart.chartArea.right - 8) {
@@ -47,7 +64,7 @@ window.descontoBadgePlugin = {
                 ctx.quadraticCurveTo(x, y, x + 6, y);
                 ctx.closePath();
                 ctx.fill();
-                ctx.font = 'bold 14px Segoe UI, Arial';
+                ctx.font = badgeFont;
                 ctx.fillStyle = '#fff';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
