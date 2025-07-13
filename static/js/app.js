@@ -119,22 +119,17 @@ function displayResults(data) {
     let hasResults = false;
     allProducts = [];
     
+    // Primeiro, coletar todos os produtos e erros
+    let allProductsList = [];
+    let errorsList = [];
+    
     for (const [pharmacyKey, pharmacyData] of Object.entries(results)) {
         if (pharmacyData.error) {
-            // Mostrar erro da farmácia
-            resultsDiv.innerHTML += `
-                <div class="pharmacy-card">
-                    <div class="pharmacy-header">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        ${pharmacyData.pharmacy || pharmacyKey}
-                    </div>
-                    <div class="p-3">
-                        <div class="error-message">
-                            ${pharmacyData.error}
-                        </div>
-                    </div>
-                </div>
-            `;
+            // Adicionar erro à lista
+            errorsList.push({
+                pharmacy: pharmacyData.pharmacy || pharmacyKey,
+                error: pharmacyData.error
+            });
         } else if (pharmacyData.products && pharmacyData.products.length > 0) {
             console.log(`Processando ${pharmacyData.products.length} produtos de ${pharmacyData.pharmacy}`);
             hasResults = true;
@@ -145,72 +140,90 @@ function displayResults(data) {
                     ...product,
                     pharmacy: pharmacyData.pharmacy
                 });
-            });
-            
-            let productsHtml = '';
-            pharmacyData.products.forEach(product => {
-                const priceDisplay = typeof product.price === 'number' 
-                    ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
-                    : product.price;
                 
-                const originalPriceDisplay = typeof product.original_price === 'number' 
-                    ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
-                    : product.original_price;
-                
-                productsHtml += `
-                    <div class="product-card" data-product-id="${product.name}">
-                        <div class="row align-items-center">
-                            <div class="col-md-8">
-                                <h6 class="fw-bold mb-1">${product.name}</h6>
-                                <span class="brand-badge">${product.brand}</span>
-                                ${product.description ? `<p class="description-text mb-1">${product.description}</p>` : ''}
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <div class="price">${priceDisplay}</div>
-                                ${product.has_discount ? 
-                                    `<div class="original-price">${originalPriceDisplay}</div>
-                                     <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
-                                }
-                                ${product.product_url ? 
-                                    `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                                        <i class="fas fa-external-link-alt me-1"></i>Ver produto
-                                    </a>` : ''
-                                }
-                            </div>
-                        </div>
-                    </div>
-                `;
+                // Adicionar à lista de produtos para exibição
+                allProductsList.push({
+                    ...product,
+                    pharmacy: pharmacyData.pharmacy
+                });
             });
-            
-            resultsDiv.innerHTML += `
-                <div class="pharmacy-card">
-                    <div class="pharmacy-header">
-                        <i class="fas fa-store me-2"></i>
-                        ${pharmacyData.pharmacy}
-                        <span class="badge bg-light text-dark ms-2">${pharmacyData.total_products} produtos</span>
-                    </div>
-                    <div class="p-3">
-                        ${productsHtml}
-                    </div>
-                </div>
-            `;
-        } else {
-            // Nenhum produto encontrado
-            resultsDiv.innerHTML += `
-                <div class="pharmacy-card">
-                    <div class="pharmacy-header">
-                        <i class="fas fa-store me-2"></i>
-                        ${pharmacyData.pharmacy || pharmacyKey}
-                    </div>
-                    <div class="p-3">
-                        <div class="no-results">
-                            <i class="fas fa-search fa-2x mb-3"></i>
-                            <p>Nenhum produto encontrado</p>
-                        </div>
-                    </div>
-                </div>
-            `;
         }
+    }
+    
+    // Mostrar erros primeiro (se houver)
+    errorsList.forEach(errorData => {
+        resultsDiv.innerHTML += `
+            <div class="pharmacy-card">
+                <div class="pharmacy-header">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${errorData.pharmacy}
+                </div>
+                <div class="p-3">
+                    <div class="error-message">
+                        ${errorData.error}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    // Mostrar lista única de produtos (se houver)
+    if (allProductsList.length > 0) {
+        let productsHtml = '';
+        allProductsList.forEach(product => {
+            const priceDisplay = typeof product.price === 'number' 
+                ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
+                : product.price;
+            
+            const originalPriceDisplay = typeof product.original_price === 'number' 
+                ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
+                : product.original_price;
+            
+            productsHtml += `
+                <div class="product-card" data-product-id="${product.name}">
+                    <div class="row align-items-center">
+                        <div class="col-md-1">
+                            <div class="pharmacy-logo">
+                                ${product.pharmacy === 'Droga Raia' ? 
+                                    '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
+                                    `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-1">${product.name}</h6>
+                            <span class="brand-badge">${product.brand}</span>
+                            ${product.description ? `<p class="description-text mb-1">${product.description}</p>` : ''}
+                        </div>
+                        <div class="col-md-5 text-end">
+                            <div class="price">${priceDisplay}</div>
+                            ${product.has_discount ? 
+                                `<div class="original-price">${originalPriceDisplay}</div>
+                                 <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
+                            }
+                            ${product.product_url ? 
+                                `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="fas fa-external-link-alt me-1"></i>Ver produto
+                                </a>` : ''
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        resultsDiv.innerHTML += `
+            <div class="pharmacy-card">
+                <div class="pharmacy-header">
+                    <i class="fas fa-list me-2"></i>
+                    Lista de Produtos
+                    <span class="badge bg-light text-dark ms-2">${allProductsList.length} produtos</span>
+                </div>
+                <div class="p-3">
+                    ${productsHtml}
+                </div>
+            </div>
+        `;
     }
     
     console.log('hasResults:', hasResults);
@@ -452,14 +465,14 @@ function showBrandSelector() {
             selectedProduct = allProducts.find(p => p.brand === selectedBrand);
             updatePriceChart();
             updatePositionComparison();
-            highlightFirstDrogaRaiaProduct();
+            highlightFirstProduct();
         } else {
             selectedProduct = null;
             updatePriceChart();
             document.getElementById('comparisonSection').style.display = 'none';
-            // Remover destaque na lista Droga Raia
-            document.querySelectorAll('.product-card.destaque-droga-raia').forEach(el => {
-                el.classList.remove('destaque-droga-raia');
+            // Remover destaque na lista de produtos
+            document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
+                el.classList.remove('destaque-produto');
             });
         }
     });
@@ -506,10 +519,10 @@ function updatePriceChart() {
         );
         priceChart.update();
     }
-    // Sempre remover destaque da lista Droga Raia ao atualizar gráfico sem seleção
+    // Sempre remover destaque da lista de produtos ao atualizar gráfico sem seleção
     if (!selectedProduct) {
-        document.querySelectorAll('.product-card.destaque-droga-raia').forEach(el => {
-            el.classList.remove('destaque-droga-raia');
+        document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
+            el.classList.remove('destaque-produto');
         });
     }
 }
@@ -576,25 +589,22 @@ function updatePositionComparison() {
     document.getElementById('comparisonSection').style.display = 'block';
 }
 
-function highlightFirstDrogaRaiaProduct() {
+function highlightFirstProduct() {
     // Remover destaque anterior
-    document.querySelectorAll('.product-card.destaque-droga-raia').forEach(el => {
-        el.classList.remove('destaque-droga-raia');
+    document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
+        el.classList.remove('destaque-produto');
     });
     if (!selectedProduct) return;
-    // Encontrar o primeiro card da Droga Raia com a marca selecionada
+    // Encontrar o primeiro card de qualquer farmácia com a marca selecionada
     const cards = document.querySelectorAll('.pharmacy-card');
     for (const card of cards) {
-        const header = card.querySelector('.pharmacy-header');
-        if (header && header.textContent.includes('Droga Raia')) {
-            const productCards = card.querySelectorAll('.product-card');
-            for (const prodCard of productCards) {
-                // Checar se é da marca selecionada
-                const brandBadge = prodCard.querySelector('.brand-badge');
-                if (brandBadge && brandBadge.textContent === selectedProduct.brand) {
-                    prodCard.classList.add('destaque-droga-raia');
-                    return;
-                }
+        const productCards = card.querySelectorAll('.product-card');
+        for (const prodCard of productCards) {
+            // Checar se é da marca selecionada
+            const brandBadge = prodCard.querySelector('.brand-badge');
+            if (brandBadge && brandBadge.textContent === selectedProduct.brand) {
+                prodCard.classList.add('destaque-produto');
+                return;
             }
         }
     }
