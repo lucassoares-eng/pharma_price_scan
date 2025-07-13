@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, Blueprint
 from scrapers.droga_raia import DrogaRaiaScraper
+from scrapers.sao_joao import SaoJoaoScraper
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -113,7 +114,8 @@ def search_medicines():
         
         # Lista de scrapers disponíveis
         scrapers = {
-            'droga_raia': DrogaRaiaScraper(driver=driver)
+            'droga_raia': DrogaRaiaScraper(driver=driver),
+            'sao_joao': SaoJoaoScraper(driver=driver)
         }
         
         results = {}
@@ -132,7 +134,11 @@ def search_medicines():
                         # Reiniciar driver global e tentar novamente uma vez
                         cleanup_global_driver()
                         setup_global_driver()
-                        scrapers[pharmacy_name] = DrogaRaiaScraper(driver=get_global_driver())
+                        # Recriar o scraper específico
+                        if pharmacy_name == 'droga_raia':
+                            scrapers[pharmacy_name] = DrogaRaiaScraper(driver=get_global_driver())
+                        elif pharmacy_name == 'sao_joao':
+                            scrapers[pharmacy_name] = SaoJoaoScraper(driver=get_global_driver())
                         tried_restart = True
                         continue
                     results[pharmacy_name] = {

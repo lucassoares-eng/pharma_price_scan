@@ -25,6 +25,7 @@ pharma_price_scan/
 │   ├── __init__.py
 │   ├── base_scraper.py   # Classe base para todos os scrapers
 │   ├── droga_raia.py     # Scraper para Droga Raia
+│   ├── sao_joao.py       # Scraper para São João
 │   └── example_scraper.py # Exemplo de novo scraper
 ├── static/
 │   ├── css/
@@ -77,8 +78,13 @@ A aplicação estará disponível em `http://localhost:5000`
 ```bash
 curl -X POST http://localhost:5000/api/pharma/search \
   -H "Content-Type: application/json" \
-  -d '{"medicine_description": "paracetamol"}'
+  -d '{"medicine_description": "ibuprofeno 600mg 20"}'
 ```
+
+### Farmácias Suportadas
+
+- **Droga Raia**: https://www.drogaraia.com.br
+- **São João**: https://www.saojoaofarmacias.com.br
 
 ## Integração em Outras Aplicações Flask
 

@@ -538,6 +538,8 @@ function renderProductsAndChart(products) {
                         <div class="pharmacy-logo">
                             ${product.pharmacy === 'Droga Raia' ? 
                                 '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
+                                product.pharmacy === 'São João' ?
+                                '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
                                 `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
                             }
                         </div>
