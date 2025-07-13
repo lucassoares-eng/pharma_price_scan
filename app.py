@@ -29,6 +29,11 @@ def setup_global_driver():
             # Atualizar ChromeDriver se necessário
             CHROMEDRIVER_DIR = os.path.join(os.getcwd(), "chromedriver_bin")
             chromedriver_path = os.path.join(CHROMEDRIVER_DIR, "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+            # Se não encontrar, tente na subpasta chromedriver-win64
+            if not os.path.exists(chromedriver_path):
+                chromedriver_path_alt = os.path.join(CHROMEDRIVER_DIR, "chromedriver-win64", "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+                if os.path.exists(chromedriver_path_alt):
+                    chromedriver_path = chromedriver_path_alt
             
             if not os.path.exists(chromedriver_path):
                 print("ChromeDriver não encontrado. Baixando...")
@@ -115,14 +120,26 @@ def search_medicines():
         
         # Executar busca em cada farmácia
         for pharmacy_name, scraper in scrapers.items():
-            try:
-                pharmacy_results = scraper.search(medicine_description)
-                results[pharmacy_name] = pharmacy_results
-            except Exception as e:
-                results[pharmacy_name] = {
-                    'error': f'Erro ao buscar em {pharmacy_name}: {str(e)}',
-                    'products': []
-                }
+            tried_restart = False
+            while True:
+                try:
+                    pharmacy_results = scraper.search(medicine_description)
+                    results[pharmacy_name] = pharmacy_results
+                    break
+                except Exception as e:
+                    error_msg = str(e)
+                    if (not tried_restart) and ('invalid session id' in error_msg.lower()):
+                        # Reiniciar driver global e tentar novamente uma vez
+                        cleanup_global_driver()
+                        setup_global_driver()
+                        scrapers[pharmacy_name] = DrogaRaiaScraper(driver=get_global_driver())
+                        tried_restart = True
+                        continue
+                    results[pharmacy_name] = {
+                        'error': f'Erro ao buscar em {pharmacy_name}: {error_msg}',
+                        'products': []
+                    }
+                    break
         
         return jsonify({
             'medicine_description': medicine_description,

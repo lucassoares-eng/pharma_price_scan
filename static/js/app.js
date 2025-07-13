@@ -1,6 +1,97 @@
 let allProducts = [];
 let selectedProduct = null;
 let priceChart = null;
+let currentSort = 'relevancia';
+
+window.descontoBadgePlugin = {
+    afterDatasetsDraw: function(chart) {
+        const ctx = chart.ctx;
+        const dataset = chart.data.datasets[0];
+        if (!dataset.discounts) return;
+        ctx.save();
+        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+            const discount = dataset.discounts[i];
+            const price = dataset.data[i];
+            const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
+            ctx.font = 'bold 16px Segoe UI, Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Calcular o centro da barra horizontal
+            const barStart = chart.scales.x.left;
+            const centerX = barStart + (bar.x - barStart) / 2;
+            let textX = centerX;
+            let textY = bar.y;
+            // Cor do preço: preto se barra selecionada, branco caso contrário
+            let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
+            ctx.fillStyle = isSelected ? '#222' : '#fff';
+            ctx.fillText(priceLabel, textX, textY);
+            const priceWidth = ctx.measureText(priceLabel).width;
+            if (discount) {
+                // Badge imediatamente ao lado direito do texto centralizado
+                const badgeWidth = 48, badgeHeight = 24;
+                let x = textX + priceWidth / 2 + 8;
+                let y = textY - badgeHeight / 2;
+                if (x + badgeWidth > chart.chartArea.right - 8) {
+                    x = chart.chartArea.right - badgeWidth - 8;
+                }
+                ctx.fillStyle = '#dc3545';
+                ctx.beginPath();
+                ctx.moveTo(x + 6, y);
+                ctx.lineTo(x + badgeWidth - 6, y);
+                ctx.quadraticCurveTo(x + badgeWidth, y, x + badgeWidth, y + 6);
+                ctx.lineTo(x + badgeWidth, y + badgeHeight - 6);
+                ctx.quadraticCurveTo(x + badgeWidth, y + badgeHeight, x + badgeWidth - 6, y + badgeHeight);
+                ctx.lineTo(x + 6, y + badgeHeight);
+                ctx.quadraticCurveTo(x, y + badgeHeight, x, y + badgeHeight - 6);
+                ctx.lineTo(x, y + 6);
+                ctx.quadraticCurveTo(x, y, x + 6, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.font = 'bold 14px Segoe UI, Arial';
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`-${discount}%`, x + badgeWidth / 2, y + badgeHeight / 2);
+            }
+        });
+        ctx.restore();
+    }
+};
+
+function getSortedProducts(products, sortType) {
+    let sorted = [...products];
+    if (sortType === 'menor_preco') {
+        sorted.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+    } else if (sortType === 'maior_preco') {
+        sorted.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
+    } else if (sortType === 'maior_desconto') {
+        sorted.sort((a, b) => (b.discount_percentage ?? 0) - (a.discount_percentage ?? 0));
+    } else { // relevancia
+        sorted.sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity));
+    }
+    return sorted;
+}
+
+function renderSortButtons(targetId) {
+    return `
+        <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Ordenar por">
+            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='relevancia' ? ' active' : ''}" data-sort="relevancia">Relevância</button>
+            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='menor_preco' ? ' active' : ''}" data-sort="menor_preco">Menor preço</button>
+            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='maior_preco' ? ' active' : ''}" data-sort="maior_preco">Maior preço</button>
+            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='maior_desconto' ? ' active' : ''}" data-sort="maior_desconto">Maior desconto</button>
+        </div>
+    `;
+}
+
+function attachSortButtonListeners(products, renderListFn, renderChartFn) {
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.onclick = function() {
+            currentSort = this.getAttribute('data-sort');
+            renderListFn(products);
+            if (renderChartFn) renderChartFn(products);
+        };
+    });
+}
 
 document.getElementById('searchForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -169,61 +260,7 @@ function displayResults(data) {
     
     // Mostrar lista única de produtos (se houver)
     if (allProductsList.length > 0) {
-        let productsHtml = '';
-        allProductsList.forEach(product => {
-            const priceDisplay = typeof product.price === 'number' 
-                ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
-                : product.price;
-            
-            const originalPriceDisplay = typeof product.original_price === 'number' 
-                ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
-                : product.original_price;
-            
-            productsHtml += `
-                <div class="product-card" data-product-id="${product.name}">
-                    <div class="row align-items-center">
-                        <div class="col-md-1">
-                            <div class="pharmacy-logo">
-                                ${product.pharmacy === 'Droga Raia' ? 
-                                    '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
-                                    `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
-                                }
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <h6 class="fw-bold mb-1">${product.name}</h6>
-                            <span class="brand-badge">${product.brand}</span>
-                            ${product.description ? `<p class="description-text mb-1">${product.description}</p>` : ''}
-                        </div>
-                        <div class="col-md-5 text-end">
-                            <div class="price">${priceDisplay}</div>
-                            ${product.has_discount ? 
-                                `<div class="original-price">${originalPriceDisplay}</div>
-                                 <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
-                            }
-                            ${product.product_url ? 
-                                `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                                    <i class="fas fa-external-link-alt me-1"></i>Ver produto
-                                </a>` : ''
-                            }
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        resultsDiv.innerHTML += `
-            <div class="pharmacy-card">
-                <div class="pharmacy-header">
-                    <i class="fas fa-list me-2"></i>
-                    Lista de Produtos
-                    <span class="badge bg-light text-dark ms-2">${allProductsList.length} produtos</span>
-                </div>
-                <div class="p-3">
-                    ${productsHtml}
-                </div>
-            </div>
-        `;
+        renderProductsAndChart(allProductsList);
     }
     
     console.log('hasResults:', hasResults);
@@ -239,10 +276,9 @@ function displayResults(data) {
     } else {
         console.log('Mostrando resultados e gráficos');
         try {
-            // Mostrar estatísticas, gráficos e seletor de marca
-            updateStatistics();
-            createPriceChart();
-            showBrandSelector();
+            // Não chame mais updateStatistics() ou createPriceChart() aqui
+            // Tudo é feito por renderProductsAndChart
+            // showBrandSelector(); // Removido
         } catch (error) {
             console.error('Erro ao mostrar resultados:', error);
             displayError('Erro ao processar resultados: ' + error.message);
@@ -250,193 +286,6 @@ function displayResults(data) {
     }
     
     resultsDiv.style.display = 'block';
-}
-
-function updateStatistics() {
-    console.log('Iniciando updateStatistics');
-    const prices = allProducts.map(p => typeof p.price === 'number' ? p.price : 0).filter(p => p > 0);
-    console.log('Preços válidos:', prices);
-    
-    if (prices.length > 0) {
-        const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-        const minPrice = Math.min(...prices);
-        const maxPrice = Math.max(...prices);
-        
-        // Contar marcas únicas
-        const uniqueBrands = [...new Set(allProducts.map(p => p.brand))];
-        
-        document.getElementById('totalBrands').textContent = uniqueBrands.length;
-        document.getElementById('avgPrice').textContent = `R$ ${avgPrice.toFixed(2).replace('.', ',')}`;
-        document.getElementById('minPrice').textContent = `R$ ${minPrice.toFixed(2).replace('.', ',')}`;
-        document.getElementById('maxPrice').textContent = `R$ ${maxPrice.toFixed(2).replace('.', ',')}`;
-        
-        document.getElementById('statsSection').style.display = 'block';
-    }
-}
-
-function createPriceChart() {
-    console.log('Iniciando createPriceChart');
-    
-    // Agrupar produtos por marca e calcular preço médio por marca
-    const brandData = {};
-    allProducts.forEach(product => {
-        if (typeof product.price === 'number' && product.price > 0) {
-            if (brandData[product.brand]) {
-                brandData[product.brand].prices.push(product.price);
-            } else {
-                brandData[product.brand] = {
-                    prices: [product.price],
-                    count: 1
-                };
-            }
-        }
-    });
-    
-    // Calcular preço médio por marca e ordenar do menor para o maior
-    const sortedBrands = Object.entries(brandData)
-        .map(([brand, data]) => ({
-            brand: brand,
-            avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
-            count: data.prices.length
-        }))
-        .sort((a, b) => a.avgPrice - b.avgPrice);
-    
-    console.log('Marcas ordenadas por preço:', sortedBrands);
-    
-    // Criar gráfico
-    const priceCtx = document.getElementById('priceChart').getContext('2d');
-    const descontoBadgePlugin = {
-        afterDatasetsDraw: function(chart) {
-            const ctx = chart.ctx;
-            const dataset = chart.data.datasets[0];
-            if (!dataset.discounts) return;
-            ctx.save();
-            chart.getDatasetMeta(0).data.forEach((bar, i) => {
-                const discount = dataset.discounts[i];
-                const price = dataset.data[i];
-                const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
-                ctx.font = 'bold 16px Segoe UI, Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                // Calcular o centro da barra horizontal
-                const barStart = chart.scales.x.left;
-                const centerX = barStart + (bar.x - barStart) / 2;
-                let textX = centerX;
-                let textY = bar.y;
-                // Cor do preço: preto se barra selecionada, branco caso contrário
-                let isSelected = selectedProduct && chart.data.labels[i] === selectedProduct.brand;
-                ctx.fillStyle = isSelected ? '#222' : '#fff';
-                ctx.fillText(priceLabel, textX, textY);
-                const priceWidth = ctx.measureText(priceLabel).width;
-                if (discount) {
-                    // Badge imediatamente ao lado direito do texto centralizado
-                    const badgeWidth = 48, badgeHeight = 24;
-                    let x = textX + priceWidth / 2 + 8;
-                    let y = textY - badgeHeight / 2;
-                    if (x + badgeWidth > chart.chartArea.right - 8) {
-                        x = chart.chartArea.right - badgeWidth - 8;
-                    }
-                    ctx.fillStyle = '#dc3545';
-                    ctx.beginPath();
-                    ctx.moveTo(x + 6, y);
-                    ctx.lineTo(x + badgeWidth - 6, y);
-                    ctx.quadraticCurveTo(x + badgeWidth, y, x + badgeWidth, y + 6);
-                    ctx.lineTo(x + badgeWidth, y + badgeHeight - 6);
-                    ctx.quadraticCurveTo(x + badgeWidth, y + badgeHeight, x + badgeWidth - 6, y + badgeHeight);
-                    ctx.lineTo(x + 6, y + badgeHeight);
-                    ctx.quadraticCurveTo(x, y + badgeHeight, x, y + badgeHeight - 6);
-                    ctx.lineTo(x, y + 6);
-                    ctx.quadraticCurveTo(x, y, x + 6, y);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.font = 'bold 14px Segoe UI, Arial';
-                    ctx.fillStyle = '#fff';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(`-${discount}%`, x + badgeWidth / 2, y + badgeHeight / 2);
-                }
-            });
-            ctx.restore();
-        }
-    };
-    
-    priceChart = new Chart(priceCtx, {
-        type: 'bar',
-        data: {
-            labels: sortedBrands.map(b => b.brand),
-            datasets: [{
-                label: 'Preço Médio (R$)',
-                data: sortedBrands.map(b => b.avgPrice),
-                backgroundColor: sortedBrands.map(b =>
-                    selectedProduct
-                        ? (b.brand === selectedProduct.brand ? '#ffe4e1' : '#a3bffa')
-                        : '#667eea'
-                ),
-                borderColor: sortedBrands.map(b =>
-                    selectedProduct
-                        ? (b.brand === selectedProduct.brand ? '#c0392b' : '#a3bffa')
-                        : '#667eea'
-                ),
-                borderWidth: 1,
-                discounts: sortedBrands.map(b => {
-                    // Procure o maior desconto da marca nos produtos
-                    const brandProducts = allProducts.filter(p => p.brand === b.brand);
-                    const maxDiscount = Math.max(...brandProducts.map(p => p.discount_percentage || 0));
-                    return maxDiscount > 0 ? maxDiscount : null;
-                })
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                datalabels: { display: false }, // Desabilita ChartDataLabels
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const discount = context.dataset.discounts[context.dataIndex];
-                            let label = `Preço médio: R$ ${context.parsed.x.toFixed(2).replace('.', ',')}`;
-                            if (discount) label += ` | Desconto: -${discount}%`;
-                            return label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Preço (R$)' }
-                }
-            }
-        },
-        plugins: [descontoBadgePlugin]
-    });
-    
-    // Após criar o gráfico priceChart
-    document.getElementById('priceChart').onclick = function(evt) {
-        const points = priceChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
-        if (points.length) {
-            const index = points[0].index;
-            const brand = priceChart.data.labels[index];
-            const brandSelect = document.getElementById('brandSelect');
-            // Se já está selecionada, deseleciona
-            if (selectedProduct && selectedProduct.brand === brand) {
-                brandSelect.value = '';
-                selectedProduct = null;
-                updatePriceChart();
-                document.getElementById('comparisonSection').style.display = 'none';
-            } else {
-                brandSelect.value = brand;
-                // Disparar o evento de change para atualizar análise
-                const event = new Event('change', { bubbles: true });
-                brandSelect.dispatchEvent(event);
-            }
-        }
-    };
-
-    document.getElementById('priceChartSection').style.display = 'block';
 }
 
 function showBrandSelector() {
@@ -463,12 +312,12 @@ function showBrandSelector() {
         if (selectedBrand) {
             // Encontrar o primeiro produto da marca selecionada
             selectedProduct = allProducts.find(p => p.brand === selectedBrand);
-            updatePriceChart();
+            renderPriceChart(allProducts);
             updatePositionComparison();
             highlightFirstProduct();
         } else {
             selectedProduct = null;
-            updatePriceChart();
+            renderPriceChart(allProducts);
             document.getElementById('comparisonSection').style.display = 'none';
             // Remover destaque na lista de produtos
             document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
@@ -620,4 +469,204 @@ function displayError(message) {
         </div>
     `;
     resultsDiv.style.display = 'block';
+} 
+
+function renderProductsAndChart(products) {
+    const resultsDiv = document.getElementById('results');
+    // Renderizar header da lista com botões de ordenação
+    let productsHtml = '';
+    const sortedProducts = getSortedProducts(products, currentSort);
+    sortedProducts.forEach(product => {
+        const priceDisplay = typeof product.price === 'number' 
+            ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
+            : product.price;
+        const originalPriceDisplay = typeof product.original_price === 'number' 
+            ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
+            : product.original_price;
+        productsHtml += `
+            <div class="product-card" data-product-id="${product.name}">
+                <div class="row align-items-center">
+                    <div class="col-md-1">
+                        <div class="pharmacy-logo">
+                            ${product.pharmacy === 'Droga Raia' ? 
+                                '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
+                                `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold mb-1">${product.name}</h6>
+                        <span class="brand-badge">${product.brand}</span>
+                        ${product.description ? `<p class="description-text mb-1">${product.description}</p>` : ''}
+                    </div>
+                    <div class="col-md-5 text-end">
+                        <div class="price">${priceDisplay}</div>
+                        ${product.has_discount ? 
+                            `<div class="original-price">${originalPriceDisplay}</div>
+                             <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
+                        }
+                        ${product.product_url ? 
+                            `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>Ver produto
+                            </a>` : ''
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    resultsDiv.innerHTML = `
+        <div class="product-selector" id="brandSelector">
+            <h4><i class="fas fa-tags me-2"></i>Selecionar Marca para Análise</h4>
+            <p class="text-muted">Escolha uma marca para ver a análise comparativa:</p>
+            <div class="row">
+                <div class="col-md-6">
+                    <select id="brandSelect" class="form-select">
+                        <option value="">Selecione uma marca...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="chart-container mt-4" id="priceChartSection">
+            <div class="d-flex align-items-center justify-content-between">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Preços por Marca</h5>
+                ${renderSortButtons('priceChartSection')}
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="priceChart"></canvas>
+            </div>
+        </div>
+        <div class="pharmacy-card">
+            <div class="pharmacy-header d-flex align-items-center justify-content-between">
+                <div><i class="fas fa-list me-2"></i>Lista de Produtos <span class="badge bg-light text-dark ms-2">${products.length} produtos</span></div>
+                ${renderSortButtons('productsList')}
+            </div>
+            <div class="p-3" id="productsList">
+                ${productsHtml}
+            </div>
+        </div>
+        <div class="comparison-highlight" id="comparisonSection" style="display: none;">
+            <h5><i class="fas fa-chart-line me-2"></i>Análise Comparativa da Marca Selecionada</h5>
+            <div id="positionInfo"></div>
+        </div>
+    `;
+    attachSortButtonListeners(products, renderProductsAndChart, renderPriceChart);
+    setTimeout(() => {
+        renderPriceChart(products);
+        showBrandSelector();
+    }, 0);
+
+    // Atualizar estatísticas e gráfico de preços após a renderização
+    // updateStatistics(); // Removido
+    // createPriceChart(); // Removido
+}
+
+function renderPriceChart(products) {
+    // Agrupar produtos por marca e calcular preço médio por marca
+    const brandData = {};
+    products.forEach(product => {
+        if (typeof product.price === 'number' && product.price > 0) {
+            if (brandData[product.brand]) {
+                brandData[product.brand].prices.push(product.price);
+            } else {
+                brandData[product.brand] = {
+                    prices: [product.price],
+                    count: 1
+                };
+            }
+        }
+    });
+    // Calcular preço médio por marca e ordenar conforme o sort
+    let sortedBrands = Object.entries(brandData)
+        .map(([brand, data]) => ({
+            brand: brand,
+            avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
+            count: data.prices.length,
+            maxDiscount: Math.max(...allProducts.filter(p => p.brand === brand).map(p => p.discount_percentage || 0))
+        }));
+    if (currentSort === 'menor_preco') {
+        sortedBrands.sort((a, b) => a.avgPrice - b.avgPrice);
+    } else if (currentSort === 'maior_preco') {
+        sortedBrands.sort((a, b) => b.avgPrice - a.avgPrice);
+    } else if (currentSort === 'maior_desconto') {
+        sortedBrands.sort((a, b) => b.maxDiscount - a.maxDiscount);
+    } else { // relevancia
+        // Ordenar por menor posição de produto daquela marca
+        sortedBrands.sort((a, b) => {
+            const posA = Math.min(...allProducts.filter(p => p.brand === a.brand).map(p => p.position ?? Infinity));
+            const posB = Math.min(...allProducts.filter(p => p.brand === b.brand).map(p => p.position ?? Infinity));
+            return posA - posB;
+        });
+    }
+    // Criar gráfico
+    const priceCtx = document.getElementById('priceChart').getContext('2d');
+    if (window.priceChart && typeof window.priceChart.destroy === 'function') window.priceChart.destroy();
+    window.priceChart = new Chart(priceCtx, {
+        type: 'bar',
+        data: {
+            labels: sortedBrands.map(b => b.brand),
+            datasets: [{
+                label: 'Preço Médio (R$)',
+                data: sortedBrands.map(b => b.avgPrice),
+                backgroundColor: sortedBrands.map(b =>
+                    selectedProduct
+                        ? (b.brand === selectedProduct.brand ? '#ffe4e1' : '#a3bffa')
+                        : '#667eea'
+                ),
+                borderColor: sortedBrands.map(b =>
+                    selectedProduct
+                        ? (b.brand === selectedProduct.brand ? '#c0392b' : '#a3bffa')
+                        : '#667eea'
+                ),
+                borderWidth: 1,
+                discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null)
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const discount = context.dataset.discounts[context.dataIndex];
+                            let label = `Preço médio: R$ ${context.parsed.x.toFixed(2).replace('.', ',')}`;
+                            if (discount) label += ` | Desconto: -${discount}%`;
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Preço (R$)' }
+                }
+            }
+        },
+        plugins: [window.descontoBadgePlugin]
+    });
+    document.getElementById('priceChart').onclick = function(evt) {
+        const points = window.priceChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (points.length) {
+            const index = points[0].index;
+            const brand = window.priceChart.data.labels[index];
+            const brandSelect = document.getElementById('brandSelect');
+            // Se já está selecionada, deseleciona
+            if (selectedProduct && selectedProduct.brand === brand) {
+                brandSelect.value = '';
+                selectedProduct = null;
+                renderPriceChart(allProducts);
+                document.getElementById('comparisonSection').style.display = 'none';
+            } else {
+                brandSelect.value = brand;
+                // Disparar o evento de change para atualizar análise
+                const event = new Event('change', { bubbles: true });
+                brandSelect.dispatchEvent(event);
+            }
+        }
+    };
 } 

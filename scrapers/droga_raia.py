@@ -78,9 +78,9 @@ class DrogaRaiaScraper(BaseScraper):
         product_articles = products_container.find_all('article', class_=lambda x: x and 'vertical' in x)
         self.logger.info(f"Quantidade de <article> encontrados: {len(product_articles)}")
         
-        for article in product_articles:
+        for idx, article in enumerate(product_articles, 1):
             try:
-                product = self._extract_product_info(article)
+                product = self._extract_product_info(article, idx)
                 if product:
                     products.append(product)
             except Exception as e:
@@ -89,7 +89,7 @@ class DrogaRaiaScraper(BaseScraper):
         
         return products
     
-    def _extract_product_info(self, article):
+    def _extract_product_info(self, article, position=None):
         """
         Extrai informações de um produto do HTML
         
@@ -136,7 +136,7 @@ class DrogaRaiaScraper(BaseScraper):
             # Verificar se há desconto
             discount_info = self._extract_discount_info(article)
             
-            return {
+            product_data = {
                 'name': name,
                 'brand': brand,
                 'description': description,
@@ -144,9 +144,10 @@ class DrogaRaiaScraper(BaseScraper):
                 'original_price': price_info['original_price'],
                 'discount_percentage': discount_info['percentage'],
                 'product_url': product_link,
-                'image_url': image_url,
-                'has_discount': discount_info['has_discount']
+                'has_discount': discount_info['has_discount'],
+                'position': position
             }
+            return product_data
             
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
