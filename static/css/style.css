@@ -287,4 +287,30 @@ body {
 
 #comparisonSection h5, #comparisonSection strong, #comparisonSection small {
     color: #212529 !important;
+}
+
+/* Estilos para botões de classificação com fundo branco */
+.btn-light.sort-btn {
+    border: 1px solid #007bff;
+    color: #007bff;
+    background-color: #fff;
+    transition: all 0.3s ease;
+}
+
+.btn-light.sort-btn:hover {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: #fff;
+}
+
+.btn-light.sort-btn.active {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: #fff;
+}
+
+.btn-light.sort-btn.active:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
+    color: #fff;
 } 

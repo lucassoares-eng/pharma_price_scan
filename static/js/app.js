@@ -72,13 +72,14 @@ function getSortedProducts(products, sortType) {
     return sorted;
 }
 
-function renderSortButtons(targetId) {
+function renderSortButtons(targetId, useWhiteBackground = false) {
+    const baseClass = useWhiteBackground ? 'btn btn-light' : 'btn btn-outline-primary';
     return `
         <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Ordenar por">
-            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='relevancia' ? ' active' : ''}" data-sort="relevancia">Relevância</button>
-            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='menor_preco' ? ' active' : ''}" data-sort="menor_preco">Menor preço</button>
-            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='maior_preco' ? ' active' : ''}" data-sort="maior_preco">Maior preço</button>
-            <button type="button" class="btn btn-outline-primary sort-btn${currentSort==='maior_desconto' ? ' active' : ''}" data-sort="maior_desconto">Maior desconto</button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='relevancia' ? ' active' : ''}" data-sort="relevancia">Relevância</button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='menor_preco' ? ' active' : ''}" data-sort="menor_preco">Menor preço</button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='maior_preco' ? ' active' : ''}" data-sort="maior_preco">Maior preço</button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='maior_desconto' ? ' active' : ''}" data-sort="maior_desconto">Maior desconto</button>
         </div>
     `;
 }
@@ -358,14 +359,15 @@ function updatePriceChart() {
         priceChart.data.datasets[0].data = sortedBrands.map(b => b.avgPrice);
         priceChart.data.datasets[0].backgroundColor = sortedBrands.map(b => 
             selectedProduct
-                ? (b.brand === selectedProduct.brand ? '#ffe4e1' : '#a3bffa')
+                ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
                 : '#667eea'
         );
         priceChart.data.datasets[0].borderColor = sortedBrands.map(b => 
             selectedProduct
-                ? (b.brand === selectedProduct.brand ? '#c0392b' : '#a3bffa')
+                ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
                 : '#667eea'
         );
+        priceChart.data.datasets[0].borderWidth = 1;
         priceChart.update();
     }
     // Sempre remover destaque da lista de produtos ao atualizar gráfico sem seleção
@@ -539,7 +541,7 @@ function renderProductsAndChart(products) {
         <div class="pharmacy-card">
             <div class="pharmacy-header d-flex align-items-center justify-content-between">
                 <div><i class="fas fa-list me-2"></i>Lista de Produtos <span class="badge bg-light text-dark ms-2">${products.length} produtos</span></div>
-                ${renderSortButtons('productsList')}
+                ${renderSortButtons('productsList', true)}
             </div>
             <div class="p-3" id="productsList">
                 ${productsHtml}
@@ -610,12 +612,12 @@ function renderPriceChart(products) {
                 data: sortedBrands.map(b => b.avgPrice),
                 backgroundColor: sortedBrands.map(b =>
                     selectedProduct
-                        ? (b.brand === selectedProduct.brand ? '#ffe4e1' : '#a3bffa')
+                        ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
                         : '#667eea'
                 ),
                 borderColor: sortedBrands.map(b =>
                     selectedProduct
-                        ? (b.brand === selectedProduct.brand ? '#c0392b' : '#a3bffa')
+                        ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
                         : '#667eea'
                 ),
                 borderWidth: 1,
