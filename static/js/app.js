@@ -89,7 +89,14 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
         btn.onclick = function() {
             currentSort = this.getAttribute('data-sort');
             renderListFn(products);
-            if (renderChartFn) renderChartFn(products);
+            if (renderChartFn) {
+                renderChartFn(products);
+                setTimeout(() => {
+                    renderPositionChart(products);
+                }, 100);
+            } else {
+                renderPositionChart(products);
+            }
         };
     });
 }
@@ -310,21 +317,27 @@ function showBrandSelector() {
     // Adicionar event listener
     brandSelect.addEventListener('change', function() {
         const selectedBrand = this.value;
-        if (selectedBrand) {
-            // Encontrar o primeiro produto da marca selecionada
-            selectedProduct = allProducts.find(p => p.brand === selectedBrand);
-            renderPriceChart(allProducts);
-            updatePositionComparison();
-            highlightFirstProduct();
-        } else {
-            selectedProduct = null;
-            renderPriceChart(allProducts);
-            document.getElementById('comparisonSection').style.display = 'none';
-            // Remover destaque na lista de produtos
-            document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
-                el.classList.remove('destaque-produto');
-            });
-        }
+                    if (selectedBrand) {
+                // Encontrar o primeiro produto da marca selecionada
+                selectedProduct = allProducts.find(p => p.brand === selectedBrand);
+                renderPriceChart(allProducts);
+                setTimeout(() => {
+                    renderPositionChart(allProducts);
+                }, 100);
+                updatePositionComparison();
+                highlightFirstProduct();
+            } else {
+                selectedProduct = null;
+                renderPriceChart(allProducts);
+                setTimeout(() => {
+                    renderPositionChart(allProducts);
+                }, 100);
+                document.getElementById('comparisonSection').style.display = 'none';
+                // Remover destaque na lista de produtos
+                document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
+                    el.classList.remove('destaque-produto');
+                });
+            }
     });
     
     document.getElementById('brandSelector').style.display = 'block';
@@ -529,19 +542,37 @@ function renderProductsAndChart(products) {
                 </div>
             </div>
         </div>
-        <div class="chart-container mt-4" id="priceChartSection">
-            <div class="d-flex align-items-center justify-content-between">
-                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Preços por Marca</h5>
-                ${renderSortButtons('priceChartSection')}
+        <div class="chart-container mt-4" id="chartsSection">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Análise Comparativa</h5>
+                ${renderSortButtons('chartsSection')}
             </div>
-            <div class="chart-wrapper">
-                <canvas id="priceChart"></canvas>
+            <div class="row">
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <h6 class="text-center mb-3"><i class="fas fa-chart-bar me-2"></i>Preços por Marca</h6>
+                    <div class="chart-wrapper">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-12 mb-4">
+                    <h6 class="text-center mb-3"><i class="fas fa-sort-numeric-up me-2"></i>Posição nos Sites</h6>
+                    <div class="chart-wrapper">
+                        <canvas id="positionChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="pharmacy-card">
             <div class="pharmacy-header d-flex align-items-center justify-content-between">
-                <div><i class="fas fa-list me-2"></i>Lista de Produtos <span class="badge bg-light text-dark ms-2">${products.length} produtos</span></div>
-                ${renderSortButtons('productsList', true)}
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-list me-2"></i>Lista de Produtos <span class="badge bg-light text-dark ms-2">${products.length} produtos</span>
+                    <button type="button" class="btn btn-success btn-sm ms-3" onclick="downloadExcel()">
+                        <i class="fas fa-download me-1"></i>Exportar Excel
+                    </button>
+                </div>
+                <div class="d-flex align-items-center">
+                    ${renderSortButtons('productsList', true)}
+                </div>
             </div>
             <div class="p-3" id="productsList">
                 ${productsHtml}
@@ -555,6 +586,9 @@ function renderProductsAndChart(products) {
     attachSortButtonListeners(products, renderProductsAndChart, renderPriceChart);
     setTimeout(() => {
         renderPriceChart(products);
+        setTimeout(() => {
+            renderPositionChart(products);
+        }, 100);
         showBrandSelector();
     }, 0);
 
@@ -621,7 +655,9 @@ function renderPriceChart(products) {
                         : '#667eea'
                 ),
                 borderWidth: 1,
-                discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null)
+                discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
+                barThickness: 35,
+                maxBarThickness: 40
             }]
         },
         options: {
@@ -646,6 +682,15 @@ function renderPriceChart(products) {
                 x: {
                     beginAtZero: true,
                     title: { display: true, text: 'Preço (R$)' }
+                },
+                y: {
+                    ticks: {
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        color: '#333'
+                    }
                 }
             }
         },
@@ -671,4 +716,222 @@ function renderPriceChart(products) {
             }
         }
     };
+}
+
+function renderPositionChart(products) {
+    // Obter marcas únicas na mesma ordem do gráfico de preços
+    const priceChartData = window.priceChart ? window.priceChart.data.labels : [];
+    const brands = priceChartData.length > 0 ? priceChartData : [...new Set(products.map(p => p.brand))];
+    
+    // Obter farmácias únicas
+    const pharmacies = [...new Set(products.map(p => p.pharmacy))];
+    
+    // Criar dados do heatmap: Produto x Site
+    const heatmapData = brands.map(brand => {
+        const brandProducts = products.filter(p => p.brand === brand);
+        return pharmacies.map(pharmacy => {
+            const product = brandProducts.find(p => p.pharmacy === pharmacy);
+            return product && typeof product.position === 'number' ? product.position : null;
+        });
+    });
+    
+    // Função para determinar a cor baseada na posição
+    function getPositionColor(position) {
+        if (position === null) return '#f8f9fa'; // Cinza claro para posições não encontradas
+        if (position <= 5) return '#28a745'; // Verde para posições muito boas (1-5)
+        if (position <= 10) return '#90EE90'; // Verde claro para posições boas (6-10)
+        if (position <= 20) return '#FFD700'; // Amarelo para posições médias (11-20)
+        if (position <= 30) return '#FFA500'; // Laranja para posições ruins (21-30)
+        return '#dc3545'; // Vermelho para posições muito ruins (31+)
+    }
+    
+    // Criar gráfico heatmap
+    const positionCtx = document.getElementById('positionChart').getContext('2d');
+    if (window.positionChart && typeof window.positionChart.destroy === 'function') window.positionChart.destroy();
+    
+    // Criar dados para o heatmap usando scatter plot
+    const scatterData = [];
+    brands.forEach((brand, brandIndex) => {
+        pharmacies.forEach((pharmacy, pharmacyIndex) => {
+            const position = heatmapData[brandIndex][pharmacyIndex];
+            if (position !== null) {
+                scatterData.push({
+                    x: pharmacyIndex,
+                    y: brandIndex,
+                    r: 8, // Tamanho do ponto
+                    position: position,
+                    brand: brand,
+                    pharmacy: pharmacy
+                });
+            }
+        });
+    });
+    
+    window.positionChart = new Chart(positionCtx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Posições',
+                data: scatterData,
+                backgroundColor: scatterData.map(point => getPositionColor(point.position)),
+                borderColor: scatterData.map(point => 
+                    selectedProduct && point.brand === selectedProduct.brand ? '#1e3a8a' : '#333'
+                ),
+                borderWidth: scatterData.map(point => 
+                    selectedProduct && point.brand === selectedProduct.brand ? 2 : 1
+                ),
+                pointRadius: scatterData.map(point => 
+                    selectedProduct && point.brand === selectedProduct.brand ? 10 : 8
+                )
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const point = context.raw;
+                            return [
+                                `Marca: ${point.brand}`,
+                                `Site: ${point.pharmacy}`,
+                                `Posição: ${point.position}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    min: -0.5,
+                    max: pharmacies.length - 0.5,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            return pharmacies[value] || '';
+                        },
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    min: -0.5,
+                    max: brands.length - 0.5,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value) {
+                            return brands[value] || '';
+                        },
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+    
+    document.getElementById('positionChart').onclick = function(evt) {
+        const points = window.positionChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (points.length) {
+            const point = points[0].raw;
+            const brandSelect = document.getElementById('brandSelect');
+            // Se já está selecionada, deseleciona
+            if (selectedProduct && selectedProduct.brand === point.brand) {
+                brandSelect.value = '';
+                selectedProduct = null;
+                renderPriceChart(allProducts);
+                renderPositionChart(allProducts);
+                document.getElementById('comparisonSection').style.display = 'none';
+            } else {
+                brandSelect.value = point.brand;
+                // Disparar o evento de change para atualizar análise
+                const event = new Event('change', { bubbles: true });
+                brandSelect.dispatchEvent(event);
+            }
+        }
+    };
+} 
+
+function downloadExcel() {
+    if (!allProducts || allProducts.length === 0) {
+        alert('Nenhum dado disponível para exportar.');
+        return;
+    }
+    
+    // Preparar dados para exportação
+    const exportData = allProducts.map(product => ({
+        'Nome do Produto': product.name,
+        'Marca': product.brand,
+        'Farmácia': product.pharmacy,
+        'Preço (R$)': typeof product.price === 'number' ? product.price.toFixed(2).replace('.', ',') : product.price,
+        'Preço Original (R$)': typeof product.original_price === 'number' ? product.original_price.toFixed(2).replace('.', ',') : product.original_price,
+        'Desconto (%)': product.discount_percentage || '',
+        'Tem Desconto': product.has_discount ? 'Sim' : 'Não',
+        'Posição': product.position || '',
+        'Descrição': product.description || '',
+        'URL do Produto': product.product_url || ''
+    }));
+    
+    // Criar cabeçalho da planilha
+    const headers = Object.keys(exportData[0]);
+    
+    // Criar conteúdo CSV
+    let csvContent = '\ufeff'; // BOM para UTF-8
+    csvContent += headers.join(';') + '\n';
+    
+    exportData.forEach(row => {
+        const values = headers.map(header => {
+            const value = row[header];
+            // Escapar aspas duplas e envolver em aspas se necessário
+            if (typeof value === 'string' && (value.includes(';') || value.includes('"') || value.includes('\n'))) {
+                return '"' + value.replace(/"/g, '""') + '"';
+            }
+            return value;
+        });
+        csvContent += values.join(';') + '\n';
+    });
+    
+    // Criar blob e download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    // Gerar nome do arquivo com timestamp
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+    const fileName = `produtos_medicamentos_${timestamp}.csv`;
+    
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else {
+        // Fallback para navegadores mais antigos
+        alert('Seu navegador não suporta download automático. Copie o conteúdo abaixo:');
+        const textArea = document.createElement('textarea');
+        textArea.value = csvContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('Conteúdo copiado para a área de transferência!');
+    }
 } 

@@ -199,8 +199,14 @@ body {
 
 .chart-wrapper {
     position: relative;
-    height: 400px;
-    margin-bottom: 2rem;
+    height: 250px;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 767px) {
+    .chart-wrapper {
+        height: 200px;
+    }
 }
 
 .stats-card {
@@ -287,6 +293,12 @@ body {
 
 #comparisonSection h5, #comparisonSection strong, #comparisonSection small {
     color: #212529 !important;
+}
+
+.chart-container h6 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
 }
 
 /* Estilos para botões de classificação com fundo branco */
