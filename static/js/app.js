@@ -75,11 +75,27 @@ function getSortedProducts(products, sortType) {
 function renderSortButtons(targetId, useWhiteBackground = false) {
     const baseClass = useWhiteBackground ? 'btn btn-light' : 'btn btn-outline-primary';
     return `
-        <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Ordenar por">
-            <button type="button" class="${baseClass} sort-btn${currentSort==='relevancia' ? ' active' : ''}" data-sort="relevancia">Relevância</button>
-            <button type="button" class="${baseClass} sort-btn${currentSort==='menor_preco' ? ' active' : ''}" data-sort="menor_preco">Menor preço</button>
-            <button type="button" class="${baseClass} sort-btn${currentSort==='maior_preco' ? ' active' : ''}" data-sort="maior_preco">Maior preço</button>
-            <button type="button" class="${baseClass} sort-btn${currentSort==='maior_desconto' ? ' active' : ''}" data-sort="maior_desconto">Maior desconto</button>
+        <div class="sort-buttons-container ms-2" role="group" aria-label="Ordenar por">
+            <button type="button" class="${baseClass} sort-btn${currentSort==='relevancia' ? ' active' : ''}" data-sort="relevancia">
+                <span class="d-none d-md-inline">Relevância</span>
+                <span class="d-none d-sm-inline d-md-none">Relev</span>
+                <span class="d-inline d-sm-none">Rel</span>
+            </button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='menor_preco' ? ' active' : ''}" data-sort="menor_preco">
+                <span class="d-none d-md-inline">Menor preço</span>
+                <span class="d-none d-sm-inline d-md-none">Menor</span>
+                <span class="d-inline d-sm-none">Min</span>
+            </button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='maior_preco' ? ' active' : ''}" data-sort="maior_preco">
+                <span class="d-none d-md-inline">Maior preço</span>
+                <span class="d-none d-sm-inline d-md-none">Maior</span>
+                <span class="d-inline d-sm-none">Max</span>
+            </button>
+            <button type="button" class="${baseClass} sort-btn${currentSort==='maior_desconto' ? ' active' : ''}" data-sort="maior_desconto">
+                <span class="d-none d-md-inline">Maior desconto</span>
+                <span class="d-none d-sm-inline d-md-none">Desconto</span>
+                <span class="d-inline d-sm-none">Desc</span>
+            </button>
         </div>
     `;
 }
@@ -153,26 +169,26 @@ function displayResults(data) {
     resultsDiv.innerHTML = `
         <!-- Estatísticas -->
         <div class="container-fluid px-0">
-            <div class="row stats-row" id="statsSection" style="display: none;">
-                <div>
+            <div class="row stats-row g-2 g-md-3" id="statsSection" style="display: none;">
+                <div class="col-6 col-md-3">
                     <div class="stats-card text-center">
                         <div class="stats-number" id="totalBrands">0</div>
                         <div class="stats-label">Total de Marcas</div>
                     </div>
                 </div>
-                <div>
+                <div class="col-6 col-md-3">
                     <div class="stats-card text-center">
                         <div class="stats-number" id="minPrice">R$ 0,00</div>
                         <div class="stats-label">Menor Preço</div>
                     </div>
                 </div>
-                <div>
+                <div class="col-6 col-md-3">
                     <div class="stats-card text-center">
                         <div class="stats-number" id="avgPrice">R$ 0,00</div>
                         <div class="stats-label">Preço Médio</div>
                     </div>
                 </div>
-                <div>
+                <div class="col-6 col-md-3">
                     <div class="stats-card text-center">
                         <div class="stats-number" id="maxPrice">R$ 0,00</div>
                         <div class="stats-label">Maior Preço</div>
@@ -436,13 +452,13 @@ function updatePositionComparison() {
     const priceDiffText = priceDiff > 0 ? `+R$ ${priceDiff.toFixed(2)}` : `-R$ ${Math.abs(priceDiff).toFixed(2)}`;
     
     document.getElementById('positionInfo').innerHTML = `
-        <div class="row">
-            <div class="col-md-6">
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
                 <strong>${selectedProduct.brand}</strong><br>
                 <span class="position-indicator ${positionClass}">${positionText}</span><br>
                 <small>Posição ${position} de ${totalBrands} marcas</small>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 col-md-6">
                 <strong>Preço médio: R$ ${selectedBrandAvg.avgPrice.toFixed(2).replace('.', ',')}</strong><br>
                 <small>${priceDiffText} em relação à média geral</small><br>
                 <small>${selectedBrandAvg.prices.length} produtos encontrados</small>
@@ -500,8 +516,8 @@ function renderProductsAndChart(products) {
             : product.original_price;
         productsHtml += `
             <div class="product-card" data-product-id="${product.name}">
-                <div class="row align-items-center">
-                    <div class="col-md-1">
+                <div class="row align-items-center g-2">
+                    <div class="col-2 col-md-1">
                         <div class="pharmacy-logo">
                             ${product.pharmacy === 'Droga Raia' ? 
                                 '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
@@ -509,20 +525,20 @@ function renderProductsAndChart(products) {
                             }
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <h6 class="fw-bold mb-1">${product.name}</h6>
+                    <div class="col-7 col-md-6">
+                        <h6 class="fw-bold mb-1 text-truncate">${product.name}</h6>
                         <span class="brand-badge">${product.brand}</span>
-                        ${product.description ? `<p class="description-text mb-1">${product.description}</p>` : ''}
+                        ${product.description ? `<p class="description-text mb-1 d-none d-md-block">${product.description}</p>` : ''}
                     </div>
-                    <div class="col-md-5 text-end">
+                    <div class="col-3 col-md-5 text-end">
                         <div class="price">${priceDisplay}</div>
                         ${product.has_discount ? 
                             `<div class="original-price">${originalPriceDisplay}</div>
                              <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
                         }
                         ${product.product_url ? 
-                            `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                                <i class="fas fa-external-link-alt me-1"></i>Ver produto
+                            `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2 d-none d-md-inline-block">
+                                <i class="fas fa-external-link-alt me-1"></i><span class="d-none d-lg-inline">Ver produto</span>
                             </a>` : ''
                         }
                     </div>
@@ -543,18 +559,20 @@ function renderProductsAndChart(products) {
             </div>
         </div>
         <div class="chart-container mt-4" id="chartsSection">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Análise Comparativa</h5>
-                ${renderSortButtons('chartsSection')}
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between mb-3">
+                <h5 class="mb-2 mb-md-0"><i class="fas fa-chart-bar me-2"></i>Análise Comparativa</h5>
+                <div class="d-flex flex-wrap justify-content-center justify-content-md-end">
+                    ${renderSortButtons('chartsSection')}
+                </div>
             </div>
-            <div class="row">
-                <div class="col-lg-6 col-md-12 mb-4">
+            <div class="row g-3">
+                <div class="col-12 col-lg-6 mb-3 mb-lg-4">
                     <h6 class="text-center mb-3"><i class="fas fa-chart-bar me-2"></i>Preços por Marca</h6>
                     <div class="chart-wrapper">
                         <canvas id="priceChart"></canvas>
                     </div>
                 </div>
-                <div class="col-lg-6 col-md-12 mb-4">
+                <div class="col-12 col-lg-6 mb-3 mb-lg-4">
                     <h6 class="text-center mb-3"><i class="fas fa-sort-numeric-up me-2"></i>Posição nos Sites</h6>
                     <div class="chart-wrapper">
                         <canvas id="positionChart"></canvas>
@@ -563,18 +581,18 @@ function renderProductsAndChart(products) {
             </div>
         </div>
         <div class="pharmacy-card">
-            <div class="pharmacy-header d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
+            <div class="pharmacy-header d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between">
+                <div class="d-flex align-items-center mb-2 mb-md-0">
                     <i class="fas fa-list me-2"></i>Lista de Produtos <span class="badge bg-light text-dark ms-2">${products.length} produtos</span>
-                    <button type="button" class="btn btn-success btn-sm ms-3" onclick="downloadExcel()">
-                        <i class="fas fa-download me-1"></i>Exportar Excel
+                    <button type="button" class="btn btn-success btn-sm ms-2 ms-md-3" onclick="downloadExcel()">
+                        <i class="fas fa-download me-1"></i><span class="d-none d-sm-inline">Exportar Excel</span>
                     </button>
                 </div>
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center justify-content-center justify-content-md-end">
                     ${renderSortButtons('productsList', true)}
                 </div>
             </div>
-            <div class="p-3" id="productsList">
+            <div class="p-2 p-md-3" id="productsList">
                 ${productsHtml}
             </div>
         </div>
@@ -634,10 +652,31 @@ function renderPriceChart(products) {
             return posA - posB;
         });
     }
-    // Criar gráfico
-    const priceCtx = document.getElementById('priceChart').getContext('2d');
+
+    // --- NOVO: Ajuste responsivo e altura via CSS ---
+    const isMobile = window.innerWidth < 576;
+    const isTablet = window.innerWidth >= 576 && window.innerWidth < 992;
+    const barCount = sortedBrands.length;
+    // Ajustar altura do chart-wrapper via CSS
+    const chartWrapper = document.getElementById('priceChart').parentElement;
+    if (isMobile) {
+        chartWrapper.style.minHeight = `${Math.max(48 * barCount, 160)}px`;
+    } else if (isTablet) {
+        chartWrapper.style.minHeight = `${Math.max(38 * barCount, 180)}px`;
+    } else {
+        chartWrapper.style.minHeight = `${Math.max(32 * barCount, 200)}px`;
+    }
+
+    // Espessura e espaçamento das barras
+    let barThickness = isMobile ? 14 : isTablet ? 20 : 26;
+    let maxBarThickness = isMobile ? 18 : isTablet ? 24 : 32;
+    let barPercentage = isMobile ? 0.45 : 0.65;
+    let categoryPercentage = isMobile ? 0.5 : 0.7;
+    // Fonte dos rótulos
+    let fontSize = isMobile ? 12 : isTablet ? 13 : 14;
+
     if (window.priceChart && typeof window.priceChart.destroy === 'function') window.priceChart.destroy();
-    window.priceChart = new Chart(priceCtx, {
+    window.priceChart = new Chart(document.getElementById('priceChart').getContext('2d'), {
         type: 'bar',
         data: {
             labels: sortedBrands.map(b => b.brand),
@@ -656,14 +695,24 @@ function renderPriceChart(products) {
                 ),
                 borderWidth: 1,
                 discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
-                barThickness: 35,
-                maxBarThickness: 40
+                barThickness: barThickness,
+                maxBarThickness: maxBarThickness,
+                barPercentage: barPercentage,
+                categoryPercentage: categoryPercentage
             }]
         },
         options: {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    top: isMobile ? 10 : 20,
+                    bottom: isMobile ? 10 : 20,
+                    left: 0,
+                    right: 0
+                }
+            },
             plugins: {
                 legend: { display: false },
                 datalabels: { display: false },
@@ -684,12 +733,15 @@ function renderPriceChart(products) {
                     title: { display: true, text: 'Preço (R$)' }
                 },
                 y: {
+                    offset: true,
+                    grace: isMobile ? '10%' : '5%',
                     ticks: {
                         font: {
-                            size: 14,
+                            size: fontSize,
                             weight: 'bold'
                         },
-                        color: '#333'
+                        color: '#333',
+                        padding: isMobile ? 8 : 12
                     }
                 }
             }
