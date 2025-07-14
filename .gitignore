@@ -209,3 +209,4 @@ __marimo__/
 *_result.json
 *_results.json
 cache/
+chromedriver_bin/
