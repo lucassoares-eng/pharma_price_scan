@@ -38,34 +38,108 @@ window.descontoBadgePlugin = {
             ctx.fillText(priceLabel, textX, textY);
             const priceWidth = ctx.measureText(priceLabel).width;
             
-            // Desenhar estrela com posição no início da barra
+            // Desenhar estrelas com posições (menor e maior)
             if (position) {
-                const starSize = window.innerWidth < 576 ? 12 : window.innerWidth < 992 ? 14 : 16;
-                const starX = barStart + 8;
-                const starY = bar.y;
+                const starSize = window.innerWidth < 576 ? 8 : window.innerWidth < 992 ? 12 : 14;
+                const starSpacing = starSize * 1.4; // Espaçamento ainda menor entre as estrelas
                 
-                // Desenhar estrela
-                ctx.fillStyle = '#FFD700';
-                ctx.beginPath();
-                for (let j = 0; j < 5; j++) {
-                    const angle = (j * 4 * Math.PI) / 5 - Math.PI / 2;
-                    const x = starX + starSize * Math.cos(angle);
-                    const y = starY + starSize * Math.sin(angle);
-                    if (j === 0) {
-                        ctx.moveTo(x, y);
+                // Calcular menor e maior posição para esta marca
+                const brandProducts = allProducts.filter(p => p.brand === chart.data.labels[i]);
+                const positions = brandProducts.map(p => p.position).filter(pos => pos !== null && pos !== undefined);
+                
+                if (positions.length > 0) {
+                    const minPosition = Math.min(...positions);
+                    const maxPosition = Math.max(...positions);
+                    
+                    // Desenhar primeira estrela (maior posição) em cima da barra
+                    let starX = barStart + 12;
+                    let starY = maxPosition !== minPosition ? bar.y - starSize + 8 : bar.y - starSize + 4; // Mais abaixo quando há duas estrelas
+                    
+                    // Definir cor da primeira estrela baseada na maior posição
+                    let starColor1, textColor1;
+                    if (maxPosition === 1) {
+                        starColor1 = '#FFD700'; // Dourado
+                        textColor1 = '#333';
+                    } else if (maxPosition === 2) {
+                        starColor1 = '#C0C0C0'; // Prata
+                        textColor1 = '#333';
+                    } else if (maxPosition === 3) {
+                        starColor1 = '#CD7F32'; // Bronze
+                        textColor1 = '#333';
                     } else {
-                        ctx.lineTo(x, y);
+                        starColor1 = '#555555'; // Cinza escuro
+                        textColor1 = '#fff';
+                    }
+                    
+                    // Desenhar primeira estrela com pontas menores
+                    ctx.fillStyle = starColor1;
+                    ctx.beginPath();
+                    for (let j = 0; j < 10; j++) {
+                        const angle = (j * 2 * Math.PI) / 10 - Math.PI / 2;
+                        const radius = j % 2 === 0 ? starSize : starSize * 0.5; // Pontas menores
+                        const x = starX + radius * Math.cos(angle);
+                        const y = starY + radius * Math.sin(angle);
+                        if (j === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Adicionar número da maior posição
+                    ctx.fillStyle = textColor1;
+                    ctx.font = `bold ${starSize * 0.8}px Segoe UI, Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(maxPosition.toString(), starX, starY);
+                    
+                    // Desenhar segunda estrela (menor posição) se for diferente da primeira
+                    if (maxPosition !== minPosition) {
+                        starX = barStart + 12 + (starSpacing * 0.8); // Ajustado para sobreposição moderada
+                        
+                        // Definir cor da segunda estrela baseada na menor posição
+                        let starColor2, textColor2;
+                        if (minPosition === 1) {
+                            starColor2 = '#FFD700'; // Dourado
+                            textColor2 = '#333';
+                        } else if (minPosition === 2) {
+                            starColor2 = '#C0C0C0'; // Prata
+                            textColor2 = '#333';
+                        } else if (minPosition === 3) {
+                            starColor2 = '#CD7F32'; // Bronze
+                            textColor2 = '#333';
+                        } else {
+                            starColor2 = '#555555'; // Cinza escuro
+                            textColor2 = '#fff';
+                        }
+                        
+                        // Desenhar segunda estrela com pontas menores (acima e à direita)
+                        ctx.fillStyle = starColor2;
+                        ctx.beginPath();
+                        for (let j = 0; j < 10; j++) {
+                            const angle = (j * 2 * Math.PI) / 10 - Math.PI / 2;
+                            const radius = j % 2 === 0 ? starSize : starSize * 0.5; // Pontas menores
+                            const x = starX + radius * Math.cos(angle);
+                            const y = (starY - 8) + radius * Math.sin(angle); // Mantém 8px acima da primeira
+                            if (j === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                        
+                        // Adicionar número da menor posição
+                        ctx.fillStyle = textColor2;
+                        ctx.font = `bold ${starSize * 0.8}px Segoe UI, Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(minPosition.toString(), starX, starY - 8); // 8px mais acima
                     }
                 }
-                ctx.closePath();
-                ctx.fill();
-                
-                // Adicionar número da posição
-                ctx.fillStyle = '#333';
-                ctx.font = `bold ${starSize * 0.6}px Segoe UI, Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(position.toString(), starX, starY);
             }
             
             if (discount) {
@@ -619,6 +693,26 @@ function renderProductsAndChart(products) {
                     <div class="chart-wrapper">
                         <canvas id="priceChart"></canvas>
                     </div>
+                    <!-- Legenda das estrelas -->
+                    <div class="star-legend mt-3 text-center">
+                        <small class="text-muted">
+                            <span class="legend-item me-3">
+                                <span class="legend-star" style="color: #FFD700;">★</span> 1ª posição
+                            </span>
+                            <span class="legend-item me-3">
+                                <span class="legend-star" style="color: #C0C0C0;">★</span> 2ª posição
+                            </span>
+                            <span class="legend-item me-3">
+                                <span class="legend-star" style="color: #CD7F32;">★</span> 3ª posição
+                            </span>
+                            <span class="legend-item me-3">
+                                <span class="legend-star" style="color: #555555;">★</span> 4ª+ posição
+                            </span>
+                            <span class="legend-item">
+                                <i class="fas fa-info-circle me-1"></i>Primeira estrela: menor posição | Segunda estrela: maior posição
+                            </span>
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -700,16 +794,16 @@ function renderPriceChart(products) {
     // Ajustar altura do chart-wrapper via CSS
     const chartWrapper = document.getElementById('priceChart').parentElement;
     if (isMobile) {
-        chartWrapper.style.minHeight = `${Math.max(48 * barCount, 160)}px`;
+        chartWrapper.style.minHeight = `${Math.max(60 * barCount, 200)}px`; // Altura aumentada para mobile
     } else if (isTablet) {
-        chartWrapper.style.minHeight = `${Math.max(38 * barCount, 180)}px`;
+        chartWrapper.style.minHeight = `${Math.max(45 * barCount, 220)}px`; // Altura aumentada para tablet
     } else {
         chartWrapper.style.minHeight = `${Math.max(32 * barCount, 200)}px`;
     }
 
     // Espessura e espaçamento das barras
-    let barThickness = isMobile ? 14 : isTablet ? 20 : 26;
-    let maxBarThickness = isMobile ? 18 : isTablet ? 24 : 32;
+    let barThickness = isMobile ? 14 : isTablet ? 20 : 32;
+    let maxBarThickness = isMobile ? 18 : isTablet ? 24 : 40;
     let barPercentage = isMobile ? 0.45 : 0.65;
     let categoryPercentage = isMobile ? 0.5 : 0.7;
     // Fonte dos rótulos
@@ -782,7 +876,7 @@ function renderPriceChart(products) {
                             weight: 'bold'
                         },
                         color: '#333',
-                        padding: isMobile ? 8 : 12
+                        padding: isMobile ? 16 : 20
                     }
                 }
             }
