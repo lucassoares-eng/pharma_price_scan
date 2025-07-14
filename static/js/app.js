@@ -53,19 +53,19 @@ window.descontoBadgePlugin = {
                     
                     // Desenhar primeira estrela (maior posição) em cima da barra
                     let starX = barStart + 12;
-                    let starY = maxPosition !== minPosition ? bar.y - starSize + 8 : bar.y - starSize + 4; // Mais abaixo quando há duas estrelas
+                    let starY = maxPosition !== minPosition ? bar.y + 8 : bar.y; // No meio quando uma estrela, mais abaixo quando duas
                     
                     // Definir cor da primeira estrela baseada na maior posição
                     let starColor1, textColor1;
                     if (maxPosition === 1) {
                         starColor1 = '#FFD700'; // Dourado
-                        textColor1 = '#333';
+                        textColor1 = '#fff';
                     } else if (maxPosition === 2) {
                         starColor1 = '#C0C0C0'; // Prata
-                        textColor1 = '#333';
+                        textColor1 = '#fff';
                     } else if (maxPosition === 3) {
                         starColor1 = '#CD7F32'; // Bronze
-                        textColor1 = '#333';
+                        textColor1 = '#fff';
                     } else {
                         starColor1 = '#555555'; // Cinza escuro
                         textColor1 = '#fff';
@@ -103,13 +103,13 @@ window.descontoBadgePlugin = {
                         let starColor2, textColor2;
                         if (minPosition === 1) {
                             starColor2 = '#FFD700'; // Dourado
-                            textColor2 = '#333';
+                            textColor2 = '#fff';
                         } else if (minPosition === 2) {
                             starColor2 = '#C0C0C0'; // Prata
-                            textColor2 = '#333';
+                            textColor2 = '#fff';
                         } else if (minPosition === 3) {
                             starColor2 = '#CD7F32'; // Bronze
-                            textColor2 = '#333';
+                            textColor2 = '#fff';
                         } else {
                             starColor2 = '#555555'; // Cinza escuro
                             textColor2 = '#fff';
@@ -122,7 +122,7 @@ window.descontoBadgePlugin = {
                             const angle = (j * 2 * Math.PI) / 10 - Math.PI / 2;
                             const radius = j % 2 === 0 ? starSize : starSize * 0.5; // Pontas menores
                             const x = starX + radius * Math.cos(angle);
-                            const y = (starY - 8) + radius * Math.sin(angle); // Mantém 8px acima da primeira
+                            const y = (starY - 12) + radius * Math.sin(angle); // Posicionada mais acima da primeira
                             if (j === 0) {
                                 ctx.moveTo(x, y);
                             } else {
@@ -137,7 +137,7 @@ window.descontoBadgePlugin = {
                         ctx.font = `bold ${starSize * 0.8}px Segoe UI, Arial`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText(minPosition.toString(), starX, starY - 8); // 8px mais acima
+                        ctx.fillText(minPosition.toString(), starX, starY - 12); // Posicionada mais acima da primeira
                     }
                 }
             }
@@ -464,7 +464,7 @@ function showBrandSelector() {
                 selectedProduct = allProducts.find(p => p.brand === selectedBrand);
                 renderPriceChart(allProducts);
                 updatePositionComparison();
-                highlightFirstProduct();
+                highlightAllProductsOfBrand();
             } else {
                 selectedProduct = null;
                 renderPriceChart(allProducts);
@@ -507,14 +507,10 @@ function updatePriceChart() {
         priceChart.data.labels = sortedBrands.map(b => b.brand);
         priceChart.data.datasets[0].data = sortedBrands.map(b => b.avgPrice);
         priceChart.data.datasets[0].backgroundColor = sortedBrands.map(b => 
-            selectedProduct
-                ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
-                : '#667eea'
+            selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
         );
         priceChart.data.datasets[0].borderColor = sortedBrands.map(b => 
-            selectedProduct
-                ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
-                : '#667eea'
+            selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
         );
         priceChart.data.datasets[0].borderWidth = 1;
         priceChart.update();
@@ -589,13 +585,14 @@ function updatePositionComparison() {
     document.getElementById('comparisonSection').style.display = 'block';
 }
 
-function highlightFirstProduct() {
+function highlightAllProductsOfBrand() {
     // Remover destaque anterior
     document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
         el.classList.remove('destaque-produto');
     });
     if (!selectedProduct) return;
-    // Encontrar o primeiro card de qualquer farmácia com a marca selecionada
+    
+    // Encontrar todos os cards de produtos da marca selecionada
     const cards = document.querySelectorAll('.pharmacy-card');
     for (const card of cards) {
         const productCards = card.querySelectorAll('.product-card');
@@ -604,7 +601,6 @@ function highlightFirstProduct() {
             const brandBadge = prodCard.querySelector('.brand-badge');
             if (brandBadge && brandBadge.textContent === selectedProduct.brand) {
                 prodCard.classList.add('destaque-produto');
-                return;
             }
         }
     }
@@ -818,14 +814,10 @@ function renderPriceChart(products) {
                 label: 'Preço Médio (R$)',
                 data: sortedBrands.map(b => b.avgPrice),
                 backgroundColor: sortedBrands.map(b =>
-                    selectedProduct
-                        ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
-                        : '#667eea'
+                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
                 ),
                 borderColor: sortedBrands.map(b =>
-                    selectedProduct
-                        ? (b.brand === selectedProduct.brand ? '#1e3a8a' : '#a3bffa')
-                        : '#667eea'
+                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
                 ),
                 borderWidth: 1,
                 discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
@@ -883,6 +875,69 @@ function renderPriceChart(products) {
         },
         plugins: [window.descontoBadgePlugin]
     });
+    // Adicionar hover para as estrelas
+    document.getElementById('priceChart').onmousemove = function(evt) {
+        const rect = this.getBoundingClientRect();
+        const x = evt.clientX - rect.left;
+        const y = evt.clientY - rect.top;
+        
+        // Remover tooltip anterior
+        const existingTooltip = document.getElementById('starTooltip');
+        if (existingTooltip) {
+            existingTooltip.remove();
+        }
+        
+        // Verificar se está na área das estrelas (lado esquerdo do gráfico)
+        const chartArea = window.priceChart.chartArea;
+        if (x < chartArea.left + 60 && y > chartArea.top && y < chartArea.bottom) {
+            // Encontrar a marca correspondente baseada na posição Y
+            const barHeight = (chartArea.bottom - chartArea.top) / window.priceChart.data.labels.length;
+            const brandIndex = Math.floor((y - chartArea.top) / barHeight);
+            
+            if (brandIndex >= 0 && brandIndex < window.priceChart.data.labels.length) {
+                const brand = window.priceChart.data.labels[brandIndex];
+                const brandProducts = allProducts.filter(p => p.brand === brand);
+                
+                if (brandProducts.length > 0) {
+                    // Criar tooltip com informações das farmácias
+                    const tooltip = document.createElement('div');
+                    tooltip.id = 'starTooltip';
+                    tooltip.style.cssText = `
+                        position: absolute;
+                        background: rgba(0,0,0,0.8);
+                        color: white;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        font-size: 12px;
+                        z-index: 1000;
+                        pointer-events: none;
+                        left: ${evt.clientX + 10}px;
+                        top: ${evt.clientY - 10}px;
+                        max-width: 200px;
+                    `;
+                    
+                    let tooltipContent = `<strong>${brand}</strong><br>`;
+                    brandProducts.forEach(product => {
+                        if (product.position) {
+                            tooltipContent += `${product.pharmacy}: posição ${product.position}<br>`;
+                        }
+                    });
+                    
+                    tooltip.innerHTML = tooltipContent;
+                    document.body.appendChild(tooltip);
+                }
+            }
+        }
+    };
+    
+    // Remover tooltip quando sair da área do gráfico
+    document.getElementById('priceChart').onmouseleave = function() {
+        const existingTooltip = document.getElementById('starTooltip');
+        if (existingTooltip) {
+            existingTooltip.remove();
+        }
+    };
+    
     document.getElementById('priceChart').onclick = function(evt) {
         const points = window.priceChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
         if (points.length) {
@@ -895,6 +950,10 @@ function renderPriceChart(products) {
                 selectedProduct = null;
                 renderPriceChart(allProducts);
                 document.getElementById('comparisonSection').style.display = 'none';
+                // Remover destaque na lista de produtos
+                document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
+                    el.classList.remove('destaque-produto');
+                });
             } else {
                 brandSelect.value = brand;
                 // Disparar o evento de change para atualizar análise
@@ -1044,6 +1103,10 @@ function renderPositionChart(products) {
                 renderPriceChart(allProducts);
                 renderPositionChart(allProducts);
                 document.getElementById('comparisonSection').style.display = 'none';
+                // Remover destaque na lista de produtos
+                document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
+                    el.classList.remove('destaque-produto');
+                });
             } else {
                 brandSelect.value = point.brand;
                 // Disparar o evento de change para atualizar análise
