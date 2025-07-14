@@ -142,7 +142,7 @@ window.descontoBadgePlugin = {
                 }
             }
             
-            if (discount) {
+            if (discount || (dataset.minDiscounts && dataset.minDiscounts[i] !== null)) {
                 // --- Ajuste responsivo do badge ---
                 let badgeWidth = 48, badgeHeight = 24, badgeFont = 'bold 14px Segoe UI, Arial';
                 if (window.innerWidth < 576) {
@@ -154,30 +154,76 @@ window.descontoBadgePlugin = {
                     badgeHeight = 20;
                     badgeFont = 'bold 12px Segoe UI, Arial';
                 }
-                // Badge imediatamente ao lado direito do texto centralizado
-                let x = textX + priceWidth / 2 + 8;
-                let y = textY - badgeHeight / 2;
-                if (x + badgeWidth > chart.chartArea.right - 8) {
-                    x = chart.chartArea.right - badgeWidth - 8;
+                
+                // Verificar se há múltiplos descontos para esta marca
+                const minDiscount = dataset.minDiscounts ? dataset.minDiscounts[i] : null;
+                const maxDiscount = dataset.maxDiscounts ? dataset.maxDiscounts[i] : null;
+                const hasMultipleDiscounts = minDiscount !== null && maxDiscount !== null && minDiscount !== maxDiscount;
+                
+                if (hasMultipleDiscounts) {
+                    // Badge único com maior desconto
+                    let x = textX + priceWidth / 2 + 8;
+                    let y = textY - badgeHeight / 2;
+                    
+                    // Calcular texto com "até"
+                    const maxText = `até -${maxDiscount}%`;
+                    
+                    // Ajustar largura do badge baseado no texto
+                    const textWidth = ctx.measureText(maxText).width;
+                    const adjustedBadgeWidth = Math.max(badgeWidth, textWidth + 16);
+                    
+                    if (x + adjustedBadgeWidth > chart.chartArea.right - 8) {
+                        x = chart.chartArea.right - adjustedBadgeWidth - 8;
+                    }
+                    
+                    // Desenhar badge
+                    ctx.fillStyle = '#dc3545';
+                    ctx.beginPath();
+                    ctx.moveTo(x + 6, y);
+                    ctx.lineTo(x + adjustedBadgeWidth - 6, y);
+                    ctx.quadraticCurveTo(x + adjustedBadgeWidth, y, x + adjustedBadgeWidth, y + 6);
+                    ctx.lineTo(x + adjustedBadgeWidth, y + badgeHeight - 6);
+                    ctx.quadraticCurveTo(x + adjustedBadgeWidth, y + badgeHeight, x + adjustedBadgeWidth - 6, y + badgeHeight);
+                    ctx.lineTo(x + 6, y + badgeHeight);
+                    ctx.quadraticCurveTo(x, y + badgeHeight, x, y + badgeHeight - 6);
+                    ctx.lineTo(x, y + 6);
+                    ctx.quadraticCurveTo(x, y, x + 6, y);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Texto com "até"
+                    ctx.font = badgeFont;
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(maxText, x + adjustedBadgeWidth / 2, y + badgeHeight / 2);
+                    
+                } else {
+                    // Badge único (comportamento original)
+                    let x = textX + priceWidth / 2 + 8;
+                    let y = textY - badgeHeight / 2;
+                    if (x + badgeWidth > chart.chartArea.right - 8) {
+                        x = chart.chartArea.right - badgeWidth - 8;
+                    }
+                    ctx.fillStyle = '#dc3545';
+                    ctx.beginPath();
+                    ctx.moveTo(x + 6, y);
+                    ctx.lineTo(x + badgeWidth - 6, y);
+                    ctx.quadraticCurveTo(x + badgeWidth, y, x + badgeWidth, y + 6);
+                    ctx.lineTo(x + badgeWidth, y + badgeHeight - 6);
+                    ctx.quadraticCurveTo(x + badgeWidth, y + badgeHeight, x + badgeWidth - 6, y + badgeHeight);
+                    ctx.lineTo(x + 6, y + badgeHeight);
+                    ctx.quadraticCurveTo(x, y + badgeHeight, x, y + badgeHeight - 6);
+                    ctx.lineTo(x, y + 6);
+                    ctx.quadraticCurveTo(x, y, x + 6, y);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.font = badgeFont;
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`-${discount}%`, x + badgeWidth / 2, y + badgeHeight / 2);
                 }
-                ctx.fillStyle = '#dc3545';
-                ctx.beginPath();
-                ctx.moveTo(x + 6, y);
-                ctx.lineTo(x + badgeWidth - 6, y);
-                ctx.quadraticCurveTo(x + badgeWidth, y, x + badgeWidth, y + 6);
-                ctx.lineTo(x + badgeWidth, y + badgeHeight - 6);
-                ctx.quadraticCurveTo(x + badgeWidth, y + badgeHeight, x + badgeWidth - 6, y + badgeHeight);
-                ctx.lineTo(x + 6, y + badgeHeight);
-                ctx.quadraticCurveTo(x, y + badgeHeight, x, y + badgeHeight - 6);
-                ctx.lineTo(x, y + 6);
-                ctx.quadraticCurveTo(x, y, x + 6, y);
-                ctx.closePath();
-                ctx.fill();
-                ctx.font = badgeFont;
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`-${discount}%`, x + badgeWidth / 2, y + badgeHeight / 2);
             }
         });
         ctx.restore();
@@ -712,6 +758,10 @@ function renderProductsAndChart(products) {
                 </div>
             </div>
         </div>
+        <div class="comparison-highlight" id="comparisonSection" style="display: none;">
+            <h5><i class="fas fa-chart-line me-2"></i>Análise Comparativa da Marca Selecionada</h5>
+            <div id="positionInfo"></div>
+        </div>
         <div class="pharmacy-card">
             <div class="pharmacy-header d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between">
                 <div class="d-flex align-items-center mb-2 mb-md-0">
@@ -727,10 +777,6 @@ function renderProductsAndChart(products) {
             <div class="p-2 p-md-3" id="productsList">
                 ${productsHtml}
             </div>
-        </div>
-        <div class="comparison-highlight" id="comparisonSection" style="display: none;">
-            <h5><i class="fas fa-chart-line me-2"></i>Análise Comparativa da Marca Selecionada</h5>
-            <div id="positionInfo"></div>
         </div>
     `;
     attachSortButtonListeners(products, renderProductsAndChart, renderPriceChart);
@@ -761,13 +807,22 @@ function renderPriceChart(products) {
     });
     // Calcular preço médio por marca e ordenar conforme o sort
     let sortedBrands = Object.entries(brandData)
-        .map(([brand, data]) => ({
-            brand: brand,
-            avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
-            count: data.prices.length,
-            maxDiscount: Math.max(...allProducts.filter(p => p.brand === brand).map(p => p.discount_percentage || 0)),
-            minPosition: Math.min(...allProducts.filter(p => p.brand === brand).map(p => p.position ?? Infinity))
-        }));
+        .map(([brand, data]) => {
+            const brandProducts = allProducts.filter(p => p.brand === brand);
+            const discounts = brandProducts.map(p => p.discount_percentage || 0);
+            const maxDiscount = discounts.length > 0 ? Math.max(...discounts) : 0;
+            const minDiscount = discounts.length > 0 ? Math.min(...discounts) : 0;
+            
+            return {
+                brand: brand,
+                avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
+                count: data.prices.length,
+                maxDiscount: maxDiscount,
+                minDiscount: minDiscount,
+                hasMultipleDiscounts: maxDiscount !== minDiscount,
+                minPosition: Math.min(...allProducts.filter(p => p.brand === brand).map(p => p.position ?? Infinity))
+            };
+        });
     if (currentSort === 'menor_preco') {
         sortedBrands.sort((a, b) => a.avgPrice - b.avgPrice);
     } else if (currentSort === 'maior_preco') {
@@ -821,6 +876,8 @@ function renderPriceChart(products) {
                 ),
                 borderWidth: 1,
                 discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
+                minDiscounts: sortedBrands.map(b => b.hasMultipleDiscounts ? b.minDiscount : null),
+                maxDiscounts: sortedBrands.map(b => b.hasMultipleDiscounts ? b.maxDiscount : null),
                 positions: sortedBrands.map(b => b.minPosition !== Infinity ? b.minPosition : null),
                 barThickness: barThickness,
                 maxBarThickness: maxBarThickness,
@@ -847,8 +904,15 @@ function renderPriceChart(products) {
                     callbacks: {
                         label: function(context) {
                             const discount = context.dataset.discounts[context.dataIndex];
+                            const minDiscount = context.dataset.minDiscounts ? context.dataset.minDiscounts[context.dataIndex] : null;
+                            const maxDiscount = context.dataset.maxDiscounts ? context.dataset.maxDiscounts[context.dataIndex] : null;
                             let label = `Preço médio: R$ ${context.parsed.x.toFixed(2).replace('.', ',')}`;
-                            if (discount) label += ` | Desconto: -${discount}%`;
+                            
+                            if (minDiscount !== null && maxDiscount !== null && minDiscount !== maxDiscount) {
+                                label += ` | Desconto: até -${maxDiscount}%`;
+                            } else if (discount) {
+                                label += ` | Desconto: -${discount}%`;
+                            }
                             return label;
                         }
                     }
