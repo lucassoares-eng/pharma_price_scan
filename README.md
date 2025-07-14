@@ -1,79 +1,83 @@
 # Pharma Price Scanner
 
-Sistema de busca de preços de medicamentos em diferentes farmácias usando web scraping com Selenium.
+A web application and API for searching medicine prices across multiple Brazilian pharmacies using Selenium-based web scraping. Features unified product results, caching, and a simple web interface.
 
-## Características
+## Features
 
-- **Driver Selenium Compartilhado**: O driver é inicializado uma única vez na aplicação e reutilizado por todos os scrapers
-- **Gerenciamento Automático do ChromeDriver**: Verifica e atualiza automaticamente o ChromeDriver conforme necessário
-- **Múltiplas Farmácias**: Suporte para múltiplas farmácias com scrapers independentes
-- **Interface Web**: Interface simples para busca de medicamentos
-- **API REST**: Endpoint para busca programática
-- **Arquitetura Modular**: Blueprints Flask para fácil integração em outras aplicações
-- **Arquivos Estáticos Organizados**: CSS e JavaScript separados em arquivos independentes
+- **Shared Selenium Driver**: The driver is initialized once and reused by all scrapers
+- **Automatic ChromeDriver Management**: Automatically checks and updates ChromeDriver as needed
+- **Multiple Pharmacies**: Support for multiple pharmacies with independent scrapers
+- **Web Interface**: Simple interface for searching medicines
+- **REST API**: Programmatic search endpoint
+- **Modular Architecture**: Flask blueprints for easy integration
+- **Organized Static Files**: CSS and JavaScript separated
+- **Search Cache**: Results for each pharmacy are cached for 24 hours to avoid repeated searches with the same terms. Cache is only used if the search terms are exactly the same. Unified product results are always recalculated and not cached.
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
 pharma_price_scan/
-├── app.py                 # Aplicação Flask principal com blueprints
-├── requirements.txt       # Dependências Python
-├── integration_example.py # Exemplo de integração em outras apps
-├── pharma_integration.py # Módulo de integração facilitada
-├── setup.py              # Configuração para instalação como pacote
+├── app.py                 # Main Flask application with blueprints
+├── requirements.txt       # Python dependencies
+├── integration_example.py # Example integration
+├── pharma_integration.py  # Integration module
+├── setup.py               # Package setup
 ├── scrapers/
 │   ├── __init__.py
-│   ├── base_scraper.py   # Classe base para todos os scrapers
-│   ├── droga_raia.py     # Scraper para Droga Raia
-│   ├── sao_joao.py       # Scraper para São João
-│   └── example_scraper.py # Exemplo de novo scraper
+│   ├── base_scraper.py   # Base class for all scrapers
+│   ├── droga_raia.py     # Scraper for Droga Raia
+│   ├── sao_joao.py       # Scraper for São João
+│   └── example_scraper.py # Example scraper
 ├── static/
 │   ├── css/
-│   │   └── style.css     # Estilos CSS da aplicação
+│   │   └── style.css     # CSS styles
 │   └── js/
-│       └── app.js        # JavaScript da aplicação
+│       └── app.js        # JavaScript
 └── templates/
-    └── index.html         # Interface web
+    └── index.html         # Web interface
 ```
 
-## Instalação
+## Installation
 
-1. Clone o repositório:
+1. Clone the repository:
 ```bash
 git clone <repository-url>
 cd pharma_price_scan
 ```
 
-2. Crie um ambiente virtual:
+2. Create a virtual environment:
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# ou
+# or
 venv\Scripts\activate     # Windows
 ```
 
-3. Instale as dependências:
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Uso
+## Usage
 
-### Executar a Aplicação Standalone
+### Run the Application
 
 ```bash
 python app.py
 ```
 
-A aplicação estará disponível em `http://localhost:5000`
+The app will be available at `http://localhost:5000`
 
-### Endpoints Disponíveis
+### Available Endpoints
 
-- `GET /`: Interface web para busca de medicamentos
-- `POST /api/pharma/search`: API para busca de medicamentos
-- `GET /api/pharma/health`: Verificar status do driver
+- `GET /`: Web interface for searching medicines
+- `POST /api/pharma/search`: API for searching medicines (returns pharmacy and unified results)
+- `POST /api/pharma/search_unified`: API for searching medicines (returns only unified results)
+- `GET /api/pharma/health`: Check Selenium driver status
+- `GET /api/pharma/cache/stats`: Get cache statistics
+- `POST /api/pharma/cache/clear`: Clear expired cache files
 
-### Exemplo de Uso da API
+#### Example API Usage
 
 ```bash
 curl -X POST http://localhost:5000/api/pharma/search \
@@ -81,14 +85,25 @@ curl -X POST http://localhost:5000/api/pharma/search \
   -d '{"medicine_description": "ibuprofeno 600mg 20"}'
 ```
 
-### Farmácias Suportadas
+### Supported Pharmacies
 
 - **Droga Raia**: https://www.drogaraia.com.br
 - **São João**: https://www.saojoaofarmacias.com.br
 
-## Integração em Outras Aplicações Flask
+## Cache Functionality
 
-### Método 1: Integração Simples
+- **How it works:**
+  - Each search term is cached per pharmacy for 24 hours.
+  - If the same term is searched again within 24 hours, cached pharmacy results are used.
+  - If the term is different or the cache is expired, a new search is performed.
+  - Only raw pharmacy results are cached. Unified product results are always recalculated.
+- **Cache endpoints:**
+  - `GET /api/pharma/cache/stats`: Returns cache file count, valid/expired files, and size.
+  - `POST /api/pharma/cache/clear`: Removes expired cache files.
+
+## Integration in Other Flask Apps
+
+### Method 1: Simple Integration
 
 ```python
 from flask import Flask
@@ -96,19 +111,19 @@ from pharma_integration import integrate_pharma_scanner
 
 app = Flask(__name__)
 
-# Integrar o Pharma Scanner
+# Integrate Pharma Scanner
 integration = integrate_pharma_scanner(app)
 
-# Suas rotas existentes
+# Your existing routes
 @app.route('/')
 def home():
-    return "Minha aplicação"
+    return "My app"
 
 if __name__ == '__main__':
     app.run(debug=True)
 ```
 
-### Método 2: Integração com Prefixo Personalizado
+### Method 2: Custom Prefix Integration
 
 ```python
 from flask import Flask
@@ -116,16 +131,16 @@ from pharma_integration import integrate_pharma_scanner
 
 app = Flask(__name__)
 
-# Integrar com prefixo personalizado
+# Integrate with custom prefix
 integration = integrate_pharma_scanner(app, url_prefix='/medicines')
 
-# Agora os endpoints estarão em:
+# Endpoints will be at:
 # - /medicines/api/pharma/search
 # - /medicines/api/pharma/health
-# - /medicines/ (interface web)
+# - /medicines/ (web interface)
 ```
 
-### Método 3: Integração Manual
+### Method 3: Manual Integration
 
 ```python
 from flask import Flask
@@ -134,23 +149,23 @@ import atexit
 
 app = Flask(__name__)
 
-# Inicializar driver
+# Initialize driver
 if init_driver():
-    # Registrar blueprints
+    # Register blueprints
     pharma_blueprints = get_blueprints()
     for blueprint in pharma_blueprints:
         app.register_blueprint(blueprint)
     
-    # Configurar limpeza
+    # Setup cleanup
     atexit.register(cleanup_global_driver)
 
-# Suas rotas
+# Your routes
 @app.route('/')
 def home():
-    return "Minha aplicação"
+    return "My app"
 ```
 
-### Método 4: Usando a Classe de Integração
+### Method 4: Using the Integration Class
 
 ```python
 from flask import Flask
@@ -158,139 +173,56 @@ from pharma_integration import PharmaScannerIntegration
 
 app = Flask(__name__)
 
-# Criar integração
+# Create integration
 integration = PharmaScannerIntegration(app)
 
-# Registrar blueprints quando necessário
+# Register blueprints as needed
 integration.register_blueprints(url_prefix='/pharma')
 
-# Suas rotas
+# Your routes
 @app.route('/')
 def home():
-    return "Minha aplicação"
+    return "My app"
 ```
 
-## Adicionando Novos Scrapers
+## Adding New Scrapers
 
-Para adicionar um novo scraper para uma nova farmácia:
+To add a new pharmacy scraper:
 
-1. Crie um novo arquivo em `scrapers/` (ex: `scrapers/nova_farmacia.py`)
-
-2. Implemente a classe do scraper seguindo o padrão:
+1. Create a new file in `scrapers/` (e.g., `scrapers/new_pharmacy.py`)
+2. Implement the scraper class following the pattern:
 
 ```python
 from .base_scraper import BaseScraper
 
-class NovaFarmaciaScraper(BaseScraper):
+class NewPharmacyScraper(BaseScraper):
     def __init__(self, driver=None):
         super().__init__(
-            base_url="https://www.nova-farmacia.com",
-            search_url="https://www.nova-farmacia.com/search",
-            pharmacy_name="Nova Farmácia",
-            driver=driver  # Importante: aceitar o driver compartilhado
+            base_url="https://www.new-pharmacy.com",
+            search_url="https://www.new-pharmacy.com/search",
+            pharmacy_name="New Pharmacy",
+            driver=driver  # Important: accept the shared driver
         )
     
     def search(self, medicine_description):
-        # Implementar lógica de busca
+        # Implement search logic
         pass
     
     def _extract_products(self, soup):
-        # Implementar extração de produtos
-        pass
-    
-    def _extract_product_info(self, product_element):
-        # Implementar extração de informações do produto
+        # Implement product extraction
         pass
 ```
 
-3. Adicione o novo scraper ao `app.py`:
+## Running Tests
 
-```python
-from scrapers.nova_farmacia import NovaFarmaciaScraper
+To run the cache tests:
 
-# Na função search_medicines:
-scrapers = {
-    'droga_raia': DrogaRaiaScraper(driver=driver),
-    'nova_farmacia': NovaFarmaciaScraper(driver=driver)  # Adicionar aqui
-}
+```bash
+python -m unittest tests/test_cache_manager.py
 ```
 
-## Sistema de Driver Compartilhado
+---
 
-O sistema utiliza um driver Selenium global que é:
+**Repository short description:**
 
-1. **Inicializado uma única vez** quando a aplicação inicia
-2. **Reutilizado** por todos os scrapers
-3. **Gerenciado automaticamente** com verificação e atualização do ChromeDriver
-4. **Limpo adequadamente** quando a aplicação é encerrada
-
-### Vantagens
-
-- **Performance**: Evita overhead de inicializar múltiplos drivers
-- **Recursos**: Menor uso de memória e CPU
-- **Confiabilidade**: Menos instâncias do Chrome para gerenciar
-- **Manutenção**: Centralização do gerenciamento do driver
-
-### Gerenciamento do ChromeDriver
-
-O sistema automaticamente:
-
-1. Detecta a versão do Chrome instalada
-2. Baixa o ChromeDriver compatível se necessário
-3. Usa fallback para ChromeDriverManager se houver problemas
-4. Configura o driver com opções otimizadas para web scraping
-
-## Blueprints Disponíveis
-
-O sistema expõe dois blueprints principais:
-
-### `pharma_api` (API REST)
-- `POST /search`: Busca medicamentos
-- `GET /health`: Verificar status do driver
-
-### `pharma_web` (Interface Web)
-- `GET /`: Interface web para busca
-
-## Arquivos Estáticos
-
-### CSS (`static/css/style.css`)
-- Estilos responsivos e modernos
-- Gradientes e animações
-- Componentes personalizados para cards, gráficos e estatísticas
-
-### JavaScript (`static/js/app.js`)
-- Lógica de busca e exibição de resultados
-- Criação e interação com gráficos Chart.js
-- Análise comparativa de preços
-- Gerenciamento de estado da aplicação
-
-## Logs e Debugging
-
-O sistema inclui logs detalhados para debugging:
-
-- Inicialização do driver
-- Status das requisições
-- Extração de produtos
-- Erros e exceções
-
-Para ver logs mais detalhados, ajuste o nível de logging no código.
-
-## Dependências
-
-- Flask: Framework web
-- Selenium: Automação de navegador
-- BeautifulSoup4: Parsing HTML
-- webdriver-manager: Gerenciamento automático do ChromeDriver
-- requests: Requisições HTTP
-
-## Contribuição
-
-1. Fork o projeto
-2. Crie uma branch para sua feature
-3. Implemente o novo scraper seguindo o padrão estabelecido
-4. Teste adequadamente
-5. Envie um pull request
-
-## Licença
-
-Este projeto está sob a licença MIT.
+> Search and compare medicine prices from multiple Brazilian pharmacies via web scraping. Features unified results, 24h cache, and a simple web/API interface.

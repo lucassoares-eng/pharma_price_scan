@@ -13,8 +13,14 @@ from scrapers.base_scraper import get_chrome_version, get_chromedriver_url, upda
 # Importar o unificador de produtos
 from utils.product_unifier import unify_pharmacy_results
 
+# Importar o gerenciador de cache
+from utils.cache_manager import CacheManager
+
 # Variável global para o driver
 global_driver = None
+
+# Variável global para o cache manager
+cache_manager = None
 
 def setup_global_driver():
     """Configura o driver global do Selenium"""
@@ -91,6 +97,13 @@ def get_global_driver():
         setup_global_driver()
     return global_driver
 
+def get_cache_manager():
+    """Retorna o cache manager global"""
+    global cache_manager
+    if cache_manager is None:
+        cache_manager = CacheManager()
+    return cache_manager
+
 def cleanup_global_driver():
     """Limpa o driver global"""
     global global_driver
@@ -112,6 +125,29 @@ def search_medicines():
         if not medicine_description:
             return jsonify({'error': 'Descrição do medicamento é obrigatória'}), 400
         
+        # Obter cache manager
+        cache_mgr = get_cache_manager()
+        
+        # Tentar obter resultados do cache
+        cached_results = cache_mgr.get_cached_results(medicine_description)
+        
+        if cached_results is not None:
+            # Cache encontrado e válido - usar dados do cache
+            print(f"Usando cache para busca: {medicine_description}")
+            
+            # Unificar produtos semelhantes (sempre refazer a unificação)
+            unified_results = unify_pharmacy_results(cached_results, similarity_threshold=0.7)
+            
+            return jsonify({
+                'medicine_description': medicine_description,
+                'results': cached_results,
+                'unified_results': unified_results,
+                'from_cache': True
+            })
+        
+        # Cache não encontrado ou expirado - fazer nova busca
+        print(f"Fazendo nova busca para: {medicine_description}")
+        
         # Obter driver global
         driver = get_global_driver()
         
@@ -150,13 +186,17 @@ def search_medicines():
                     }
                     break
         
+        # Salvar resultados no cache (apenas os dados das farmácias, sem unificação)
+        cache_mgr.save_cache_results(medicine_description, results)
+        
         # Unificar produtos semelhantes
         unified_results = unify_pharmacy_results(results, similarity_threshold=0.7)
         
         return jsonify({
             'medicine_description': medicine_description,
             'results': results,
-            'unified_results': unified_results
+            'unified_results': unified_results,
+            'from_cache': False
         })
         
     except Exception as e:
@@ -172,6 +212,24 @@ def search_medicines_unified():
         if not medicine_description:
             return jsonify({'error': 'Descrição do medicamento é obrigatória'}), 400
         
+        # Obter cache manager
+        cache_mgr = get_cache_manager()
+        
+        # Tentar obter resultados do cache
+        cached_results = cache_mgr.get_cached_results(medicine_description)
+        
+        if cached_results is not None:
+            # Cache encontrado e válido - usar dados do cache
+            print(f"Usando cache para busca unificada: {medicine_description}")
+            
+            # Unificar produtos semelhantes (sempre refazer a unificação)
+            unified_results = unify_pharmacy_results(cached_results, similarity_threshold=0.7)
+            
+            return jsonify(unified_results)
+        
+        # Cache não encontrado ou expirado - fazer nova busca
+        print(f"Fazendo nova busca unificada para: {medicine_description}")
+        
         # Obter driver global
         driver = get_global_driver()
         
@@ -209,6 +267,9 @@ def search_medicines_unified():
                         'products': []
                     }
                     break
+        
+        # Salvar resultados no cache (apenas os dados das farmácias, sem unificação)
+        cache_mgr.save_cache_results(medicine_description, results)
         
         # Unificar produtos semelhantes
         unified_results = unify_pharmacy_results(results, similarity_threshold=0.7)
@@ -228,6 +289,26 @@ def health_check():
         return jsonify({'status': 'healthy', 'driver': 'active'})
     except Exception as e:
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+@pharma_api.route('/cache/stats', methods=['GET'])
+def cache_stats():
+    """Endpoint para obter estatísticas do cache"""
+    try:
+        cache_mgr = get_cache_manager()
+        stats = cache_mgr.get_cache_stats()
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': f'Erro ao obter estatísticas do cache: {str(e)}'}), 500
+
+@pharma_api.route('/cache/clear', methods=['POST'])
+def clear_cache():
+    """Endpoint para limpar cache expirado"""
+    try:
+        cache_mgr = get_cache_manager()
+        cache_mgr.clear_expired_cache()
+        return jsonify({'message': 'Cache expirado limpo com sucesso'})
+    except Exception as e:
+        return jsonify({'error': f'Erro ao limpar cache: {str(e)}'}), 500
 
 # Criar blueprint para as rotas da interface web
 pharma_web = Blueprint('pharma_web', __name__)

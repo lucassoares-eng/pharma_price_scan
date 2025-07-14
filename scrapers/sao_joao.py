@@ -168,20 +168,14 @@ class SaoJoaoScraper(BaseScraper):
             name_element = section.find('span', class_='vtex-product-summary-2-x-productBrand')
             name = name_element.get_text(strip=True) if name_element else "Nome não disponível"
             
-            # Marca/Fabricante - extrair da classe ou do nome
-            brand = "Marca não disponível"
-            if name and "Genérico" in name:
-                # Tentar extrair a marca do nome do produto
-                brand_match = re.search(r'Genérico\s+([^-]+)', name)
-                if brand_match:
-                    brand = brand_match.group(1).strip()
-                else:
-                    brand = "Genérico"
-            elif name:
-                # Tentar extrair marca do início do nome
-                brand_match = re.search(r'^([^-]+)', name)
-                if brand_match:
-                    brand = brand_match.group(1).strip()
+            # Link do produto
+            product_link = ""
+            link_element = section.find('a', class_='vtex-product-summary-2-x-clearLink')
+            if link_element:
+                product_link = self.base_url + link_element.get('href', '')
+            
+            # Extrair marca correta da página do produto
+            brand = self._extract_brand_from_product_page(product_link)
             
             # Descrição/Quantidade - extrair do nome
             description = ""
@@ -193,12 +187,6 @@ class SaoJoaoScraper(BaseScraper):
             
             # Preço
             price_info = self._extract_price(section)
-            
-            # Link do produto
-            product_link = ""
-            link_element = section.find('a', class_='vtex-product-summary-2-x-clearLink')
-            if link_element:
-                product_link = self.base_url + link_element.get('href', '')
             
             # Imagem do produto
             img_element = section.find('img', class_='vtex-product-summary-2-x-image')
@@ -301,6 +289,125 @@ class SaoJoaoScraper(BaseScraper):
             except ValueError:
                 return price_text
         return price_text
+    
+    def _extract_brand_from_product_page(self, product_url):
+        """
+        Extrai a marca correta da página do produto
+        
+        Args:
+            product_url (str): URL da página do produto
+            
+        Returns:
+            str: Nome da marca ou "Marca não disponível" se não conseguir extrair
+        """
+        if not product_url:
+            return "Marca não disponível"
+        
+        try:
+            self.logger.info(f"Acessando página do produto: {product_url}")
+            
+            # Abrir a página do produto
+            self.driver.get(product_url)
+            
+            # Aguardar carregamento da página
+            time.sleep(2)
+            
+            # Tentar aceitar cookies se necessário
+            try:
+                WebDriverWait(self.driver, 3).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//button[contains(translate(., 'ACEITAR', 'aceitar'), 'aceitar') or contains(., 'Aceitar') or contains(., 'OK') or contains(., 'Ok') or contains(., 'ok') or contains(., 'Concordo') or contains(., 'concordo')]")
+                    )
+                ).click()
+                self.logger.info("Cookies aceitos na página do produto")
+            except Exception:
+                pass
+            
+            # Aguardar um pouco mais para garantir carregamento
+            time.sleep(1)
+            
+            # Procurar pela marca na página do produto
+            brand = self._find_brand_in_page()
+            
+            if brand and brand != "Marca não disponível":
+                self.logger.info(f"Marca encontrada: {brand}")
+                return brand
+            else:
+                self.logger.warning("Marca não encontrada na página do produto")
+                return "Marca não disponível"
+                
+        except Exception as e:
+            self.logger.error(f"Erro ao acessar página do produto: {e}")
+            return "Marca não disponível"
+    
+    def _find_brand_in_page(self):
+        """
+        Procura pela marca na página do produto usando diferentes seletores
+        
+        Returns:
+            str: Nome da marca encontrada ou "Marca não disponível"
+        """
+        try:
+            # Lista de seletores para tentar encontrar a marca
+            brand_selectors = [
+                "span.vtex-store-components-3-x-productBrandName",
+                ".vtex-store-components-3-x-productBrandName",
+                "span[class*='productBrandName']",
+                ".vtex-product-identifier-0-x-product-identifier__value",
+                "span[class*='brand']",
+                ".vtex-product-identifier-0-x-product-identifier__value",
+                "span[class*='manufacturer']",
+                ".vtex-product-identifier-0-x-product-identifier__value"
+            ]
+            
+            for selector in brand_selectors:
+                try:
+                    brand_element = self.driver.find_element(By.CSS_SELECTOR, selector)
+                    brand_text = brand_element.text.strip()
+                    if brand_text:
+                        self.logger.info(f"Marca encontrada com seletor '{selector}': {brand_text}")
+                        return brand_text
+                except Exception:
+                    continue
+            
+            # Tentar com XPath também
+            xpath_selectors = [
+                "//span[contains(@class, 'productBrandName')]",
+                "//span[contains(@class, 'brand')]",
+                "//span[contains(@class, 'manufacturer')]",
+                "//div[contains(@class, 'productBrandName')]",
+                "//div[contains(@class, 'brand')]"
+            ]
+            
+            for xpath in xpath_selectors:
+                try:
+                    brand_element = self.driver.find_element(By.XPATH, xpath)
+                    brand_text = brand_element.text.strip()
+                    if brand_text:
+                        self.logger.info(f"Marca encontrada com XPath '{xpath}': {brand_text}")
+                        return brand_text
+                except Exception:
+                    continue
+            
+            # Se não encontrar com seletores específicos, tentar extrair do título da página
+            try:
+                page_title = self.driver.title
+                if page_title:
+                    # Tentar extrair marca do título
+                    brand_match = re.search(r'^([^-]+)', page_title)
+                    if brand_match:
+                        brand_text = brand_match.group(1).strip()
+                        if brand_text and len(brand_text) > 2:
+                            self.logger.info(f"Marca extraída do título: {brand_text}")
+                            return brand_text
+            except Exception:
+                pass
+            
+            return "Marca não disponível"
+            
+        except Exception as e:
+            self.logger.error(f"Erro ao procurar marca na página: {e}")
+            return "Marca não disponível"
     
     def _extract_discount_info(self, section):
         """Extrai informações de desconto do produto"""

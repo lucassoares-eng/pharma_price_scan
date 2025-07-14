@@ -12,7 +12,9 @@ window.descontoBadgePlugin = {
         chart.getDatasetMeta(0).data.forEach((bar, i) => {
             const discount = dataset.discounts[i];
             const price = dataset.data[i];
+            const position = dataset.positions ? dataset.positions[i] : null;
             const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
+            
             // --- Ajuste responsivo da fonte do preço ---
             let priceFont = 'bold 16px Segoe UI, Arial';
             if (window.innerWidth < 576) {
@@ -23,16 +25,49 @@ window.descontoBadgePlugin = {
             ctx.font = priceFont;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            
             // Calcular o centro da barra horizontal
             const barStart = chart.scales.x.left;
             const centerX = barStart + (bar.x - barStart) / 2;
             let textX = centerX;
             let textY = bar.y;
+            
             // Cor do preço: preto se barra selecionada, branco caso contrário
             let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
             ctx.fillStyle = isSelected ? '#222' : '#fff';
             ctx.fillText(priceLabel, textX, textY);
             const priceWidth = ctx.measureText(priceLabel).width;
+            
+            // Desenhar estrela com posição no início da barra
+            if (position) {
+                const starSize = window.innerWidth < 576 ? 12 : window.innerWidth < 992 ? 14 : 16;
+                const starX = barStart + 8;
+                const starY = bar.y;
+                
+                // Desenhar estrela
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                for (let j = 0; j < 5; j++) {
+                    const angle = (j * 4 * Math.PI) / 5 - Math.PI / 2;
+                    const x = starX + starSize * Math.cos(angle);
+                    const y = starY + starSize * Math.sin(angle);
+                    if (j === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Adicionar número da posição
+                ctx.fillStyle = '#333';
+                ctx.font = `bold ${starSize * 0.6}px Segoe UI, Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(position.toString(), starX, starY);
+            }
+            
             if (discount) {
                 // --- Ajuste responsivo do badge ---
                 let badgeWidth = 48, badgeHeight = 24, badgeFont = 'bold 14px Segoe UI, Arial';
@@ -354,17 +389,11 @@ function showBrandSelector() {
                 // Encontrar o primeiro produto da marca selecionada
                 selectedProduct = allProducts.find(p => p.brand === selectedBrand);
                 renderPriceChart(allProducts);
-                setTimeout(() => {
-                    renderPositionChart(allProducts);
-                }, 100);
                 updatePositionComparison();
                 highlightFirstProduct();
             } else {
                 selectedProduct = null;
                 renderPriceChart(allProducts);
-                setTimeout(() => {
-                    renderPositionChart(allProducts);
-                }, 100);
                 document.getElementById('comparisonSection').style.display = 'none';
                 // Remover destaque na lista de produtos
                 document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
@@ -585,16 +614,10 @@ function renderProductsAndChart(products) {
                 </div>
             </div>
             <div class="row g-3">
-                <div class="col-12 col-lg-6 mb-3 mb-lg-4">
+                <div class="col-12">
                     <h6 class="text-center mb-3"><i class="fas fa-chart-bar me-2"></i>Preços por Marca</h6>
                     <div class="chart-wrapper">
                         <canvas id="priceChart"></canvas>
-                    </div>
-                </div>
-                <div class="col-12 col-lg-6 mb-3 mb-lg-4">
-                    <h6 class="text-center mb-3"><i class="fas fa-sort-numeric-up me-2"></i>Posição nos Sites</h6>
-                    <div class="chart-wrapper">
-                        <canvas id="positionChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -623,9 +646,6 @@ function renderProductsAndChart(products) {
     attachSortButtonListeners(products, renderProductsAndChart, renderPriceChart);
     setTimeout(() => {
         renderPriceChart(products);
-        setTimeout(() => {
-            renderPositionChart(products);
-        }, 100);
         showBrandSelector();
     }, 0);
 
@@ -655,7 +675,8 @@ function renderPriceChart(products) {
             brand: brand,
             avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
             count: data.prices.length,
-            maxDiscount: Math.max(...allProducts.filter(p => p.brand === brand).map(p => p.discount_percentage || 0))
+            maxDiscount: Math.max(...allProducts.filter(p => p.brand === brand).map(p => p.discount_percentage || 0)),
+            minPosition: Math.min(...allProducts.filter(p => p.brand === brand).map(p => p.position ?? Infinity))
         }));
     if (currentSort === 'menor_preco') {
         sortedBrands.sort((a, b) => a.avgPrice - b.avgPrice);
@@ -714,6 +735,7 @@ function renderPriceChart(products) {
                 ),
                 borderWidth: 1,
                 discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
+                positions: sortedBrands.map(b => b.minPosition !== Infinity ? b.minPosition : null),
                 barThickness: barThickness,
                 maxBarThickness: maxBarThickness,
                 barPercentage: barPercentage,
