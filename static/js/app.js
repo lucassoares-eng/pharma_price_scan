@@ -2,6 +2,7 @@ let allProducts = [];
 let selectedProduct = null;
 let priceChart = null;
 let currentSort = 'relevancia';
+let currentPharmacyFilter = ''; // Variável global para preservar o filtro
 
 window.descontoBadgePlugin = {
     afterDatasetsDraw: function(chart) {
@@ -49,7 +50,7 @@ window.descontoBadgePlugin = {
             
             // Desenhar estrelas com posições (menor e maior)
             if (position) {
-                const starSize = window.innerWidth < 576 ? 8 : window.innerWidth < 992 ? 12 : 14;
+                const starSize = window.innerWidth < 576 ? 6 : window.innerWidth < 992 ? 10 : 14;
                 const starSpacing = starSize * 1.4; // Espaçamento ainda menor entre as estrelas
                 
                 // Calcular menor e maior posição para esta marca
@@ -153,15 +154,15 @@ window.descontoBadgePlugin = {
             
             if (discount || (dataset.minDiscounts && dataset.minDiscounts[i] !== null)) {
                 // --- Ajuste responsivo do badge ---
-                let badgeWidth = 48, badgeHeight = 24, badgeFont = 'bold 14px Segoe UI, Arial';
+                let badgeWidth = 40, badgeHeight = 20, badgeFont = 'bold 12px Segoe UI, Arial';
                 if (window.innerWidth < 576) {
-                    badgeWidth = 34;
-                    badgeHeight = 18;
-                    badgeFont = 'bold 11px Segoe UI, Arial';
+                    badgeWidth = 28;
+                    badgeHeight = 14;
+                    badgeFont = 'bold 9px Segoe UI, Arial';
                 } else if (window.innerWidth < 992) {
-                    badgeWidth = 40;
-                    badgeHeight = 20;
-                    badgeFont = 'bold 12px Segoe UI, Arial';
+                    badgeWidth = 32;
+                    badgeHeight = 16;
+                    badgeFont = 'bold 10px Segoe UI, Arial';
                 }
                 
                 // Verificar se há múltiplos descontos para esta marca
@@ -291,14 +292,13 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
             const comparisonSection = document.getElementById('comparisonSection');
             const wasComparisonVisible = comparisonSection && comparisonSection.style.display !== 'none';
             
+            // Salvar estado atual do filtro de farmácia
+            const pharmacyFilter = document.getElementById('pharmacyFilter');
+            currentPharmacyFilter = pharmacyFilter ? pharmacyFilter.value : '';
+            
             renderListFn(products);
             if (renderChartFn) {
                 renderChartFn(products);
-                setTimeout(() => {
-                    renderPositionChart(products);
-                }, 100);
-            } else {
-                renderPositionChart(products);
             }
             
             // Restaurar estado da marca selecionada se existia
@@ -321,6 +321,8 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
                     highlightAllProductsOfBrand();
                 }
             }
+            
+            // O filtro de farmácia é restaurado automaticamente pelo setupPharmacyFilter
         };
     });
 }
@@ -589,13 +591,17 @@ function updatePriceChart() {
         priceChart.data.labels = sortedBrands.map(b => b.brand);
         priceChart.data.datasets[0].data = sortedBrands.map(b => b.avgPrice);
         priceChart.data.datasets[0].backgroundColor = sortedBrands.map(b => 
-            selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
+            selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
+            selectedProduct ? '#a8b4e6' : '#667eea'
         );
         priceChart.data.datasets[0].borderColor = sortedBrands.map(b => 
-            selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
+            selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
+            selectedProduct ? '#a8b4e6' : '#667eea'
         );
-        priceChart.data.datasets[0].borderWidth = 1;
-        priceChart.update();
+        const isMobile = window.innerWidth < 576;
+        const isTablet = window.innerWidth >= 576 && window.innerWidth < 992;
+        priceChart.data.datasets[0].borderWidth = isMobile ? 0 : isTablet ? 0.8 : 1;
+        priceChart.update('none'); // Desabilita animações na atualização
     }
     // Sempre remover destaque da lista de produtos ao atualizar gráfico sem seleção
     if (!selectedProduct) {
@@ -820,8 +826,18 @@ function renderProductsAndChart(products) {
                     ${renderSortButtons('productsList', true)}
                 </div>
             </div>
-            <div class="p-2 p-md-3" id="productsList">
-                ${productsHtml}
+            <div class="p-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label for="pharmacyFilter" class="form-label"><i class="fas fa-filter me-1"></i>Filtrar por Farmácia</label>
+                        <select id="pharmacyFilter" class="form-select">
+                            <option value="">Todas as farmácias</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="productsList">
+                    ${productsHtml}
+                </div>
             </div>
         </div>
     `;
@@ -829,11 +845,87 @@ function renderProductsAndChart(products) {
     setTimeout(() => {
         renderPriceChart(products);
         showBrandSelector();
+        // Só configurar o filtro se não existir ainda
+        const pharmacyFilter = document.getElementById('pharmacyFilter');
+        if (!pharmacyFilter || pharmacyFilter.options.length <= 1) {
+            setupPharmacyFilter(products);
+        }
     }, 0);
 
     // Atualizar estatísticas e gráfico de preços após a renderização
     // updateStatistics(); // Removido
     // createPriceChart(); // Removido
+}
+
+function setupPharmacyFilter(products) {
+    // Obter farmácias únicas
+    const uniquePharmacies = [...new Set(products.map(p => p.pharmacy))];
+    const pharmacyFilter = document.getElementById('pharmacyFilter');
+    
+    // Limpar opções existentes (exceto a primeira)
+    pharmacyFilter.innerHTML = '<option value="">Todas as farmácias</option>';
+    
+    // Adicionar opções de farmácias
+    uniquePharmacies.forEach(pharmacy => {
+        const option = document.createElement('option');
+        option.value = pharmacy;
+        option.textContent = pharmacy;
+        pharmacyFilter.appendChild(option);
+    });
+    
+    // Restaurar valor da variável global se ainda for válido
+    if (currentPharmacyFilter && uniquePharmacies.includes(currentPharmacyFilter)) {
+        pharmacyFilter.value = currentPharmacyFilter;
+        filterProductsByPharmacy(currentPharmacyFilter, products);
+    }
+    
+    // Adicionar event listener para filtro (só se não existir)
+    const existingListeners = pharmacyFilter.getAttribute('data-has-listener');
+    if (!existingListeners) {
+        pharmacyFilter.addEventListener('change', function() {
+            const selectedPharmacy = this.value;
+            currentPharmacyFilter = selectedPharmacy; // Atualizar variável global
+            filterProductsByPharmacy(selectedPharmacy, products);
+        });
+        pharmacyFilter.setAttribute('data-has-listener', 'true');
+    }
+}
+
+function filterProductsByPharmacy(selectedPharmacy, allProducts) {
+    const productsList = document.getElementById('productsList');
+    const productCards = productsList.querySelectorAll('.product-card');
+    
+    productCards.forEach(card => {
+        const pharmacyLogo = card.querySelector('.pharmacy-logo');
+        let pharmacyName = '';
+        
+        // Determinar a farmácia baseada no logo/imagem
+        if (pharmacyLogo.querySelector('img[src*="raia.png"]')) {
+            pharmacyName = 'Droga Raia';
+        } else if (pharmacyLogo.querySelector('img[src*="sao_joao.png"]')) {
+            pharmacyName = 'São João';
+        } else {
+            // Para outras farmácias, tentar extrair do ícone
+            const icon = pharmacyLogo.querySelector('.logo-icon');
+            if (icon) {
+                pharmacyName = icon.getAttribute('title') || icon.getAttribute('aria-label');
+            }
+        }
+        
+        // Mostrar/ocultar baseado no filtro
+        if (!selectedPharmacy || pharmacyName === selectedPharmacy) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Atualizar contador de produtos
+    const visibleProducts = productsList.querySelectorAll('.product-card[style*="display: block"], .product-card:not([style*="display: none"])');
+    const badge = document.querySelector('.pharmacy-header .badge');
+    if (badge) {
+        badge.textContent = `${visibleProducts.length} produtos`;
+    }
 }
 
 function renderPriceChart(products) {
@@ -891,18 +983,18 @@ function renderPriceChart(products) {
     // Ajustar altura do chart-wrapper via CSS
     const chartWrapper = document.getElementById('priceChart').parentElement;
     if (isMobile) {
-        chartWrapper.style.minHeight = `${Math.max(60 * barCount, 200)}px`; // Altura aumentada para mobile
+        chartWrapper.style.minHeight = `${Math.max(60 * barCount, 200)}px`; // Altura reduzida para mobile
     } else if (isTablet) {
-        chartWrapper.style.minHeight = `${Math.max(45 * barCount, 220)}px`; // Altura aumentada para tablet
+        chartWrapper.style.minHeight = `${Math.max(50 * barCount, 220)}px`; // Altura aumentada para tablet
     } else {
         chartWrapper.style.minHeight = `${Math.max(32 * barCount, 200)}px`;
     }
 
     // Espessura e espaçamento das barras
-    let barThickness = isMobile ? 14 : isTablet ? 20 : 32;
-    let maxBarThickness = isMobile ? 18 : isTablet ? 24 : 40;
-    let barPercentage = isMobile ? 0.45 : 0.65;
-    let categoryPercentage = isMobile ? 0.5 : 0.7;
+    let barThickness = isMobile ? 12 : isTablet ? 18 : 32;
+    let maxBarThickness = isMobile ? 16 : isTablet ? 22 : 40;
+    let barPercentage = isMobile ? 0.35 : 0.65;
+    let categoryPercentage = isMobile ? 0.8 : 0.7;
     // Fonte dos rótulos
     let fontSize = isMobile ? 12 : isTablet ? 13 : 14;
 
@@ -915,12 +1007,14 @@ function renderPriceChart(products) {
                 label: 'Preço Médio (R$)',
                 data: sortedBrands.map(b => b.avgPrice),
                 backgroundColor: sortedBrands.map(b =>
-                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
+                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
+                    selectedProduct ? '#a8b4e6' : '#667eea'
                 ),
                 borderColor: sortedBrands.map(b =>
-                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : '#667eea'
+                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
+                    selectedProduct ? '#a8b4e6' : '#667eea'
                 ),
-                borderWidth: 1,
+                borderWidth: isMobile ? 0 : isTablet ? 0.8 : 1,
                 discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
                 minDiscounts: sortedBrands.map(b => b.hasMultipleDiscounts ? b.minDiscount : null),
                 maxDiscounts: sortedBrands.map(b => b.hasMultipleDiscounts ? b.maxDiscount : null),
@@ -935,10 +1029,13 @@ function renderPriceChart(products) {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 0 // Desabilita todas as animações
+            },
             layout: {
                 padding: {
-                    top: isMobile ? 10 : 20,
-                    bottom: isMobile ? 10 : 20,
+                    top: isMobile ? 5 : 20,
+                    bottom: isMobile ? 5 : 20,
                     left: isMobile ? 25 : 35,
                     right: 0
                 }
@@ -971,7 +1068,7 @@ function renderPriceChart(products) {
                 },
                 y: {
                     offset: true,
-                    grace: isMobile ? '10%' : '5%',
+                    grace: isMobile ? '5%' : '5%',
                     ticks: {
                         font: {
                             size: fontSize,
@@ -979,6 +1076,13 @@ function renderPriceChart(products) {
                         },
                         color: '#333',
                         padding: isMobile ? 35 : 45
+                    }
+                }
+            },
+            transitions: {
+                active: {
+                    animation: {
+                        duration: 0
                     }
                 }
             }
@@ -1074,158 +1178,7 @@ function renderPriceChart(products) {
     };
 }
 
-function renderPositionChart(products) {
-    // Obter marcas únicas na mesma ordem do gráfico de preços
-    const priceChartData = window.priceChart ? window.priceChart.data.labels : [];
-    const brands = priceChartData.length > 0 ? priceChartData : [...new Set(products.map(p => p.brand))];
-    
-    // Obter farmácias únicas
-    const pharmacies = [...new Set(products.map(p => p.pharmacy))];
-    
-    // Criar dados do heatmap: Produto x Site
-    const heatmapData = brands.map(brand => {
-        const brandProducts = products.filter(p => p.brand === brand);
-        return pharmacies.map(pharmacy => {
-            const product = brandProducts.find(p => p.pharmacy === pharmacy);
-            return product && typeof product.position === 'number' ? product.position : null;
-        });
-    });
-    
-    // Função para determinar a cor baseada na posição
-    function getPositionColor(position) {
-        if (position === null) return '#f8f9fa'; // Cinza claro para posições não encontradas
-        if (position <= 5) return '#28a745'; // Verde para posições muito boas (1-5)
-        if (position <= 10) return '#90EE90'; // Verde claro para posições boas (6-10)
-        if (position <= 20) return '#FFD700'; // Amarelo para posições médias (11-20)
-        if (position <= 30) return '#FFA500'; // Laranja para posições ruins (21-30)
-        return '#dc3545'; // Vermelho para posições muito ruins (31+)
-    }
-    
-    // Criar gráfico heatmap
-    const positionCtx = document.getElementById('positionChart').getContext('2d');
-    if (window.positionChart && typeof window.positionChart.destroy === 'function') window.positionChart.destroy();
-    
-    // Criar dados para o heatmap usando scatter plot
-    const scatterData = [];
-    brands.forEach((brand, brandIndex) => {
-        pharmacies.forEach((pharmacy, pharmacyIndex) => {
-            const position = heatmapData[brandIndex][pharmacyIndex];
-            if (position !== null) {
-                scatterData.push({
-                    x: pharmacyIndex,
-                    y: brandIndex,
-                    r: 8, // Tamanho do ponto
-                    position: position,
-                    brand: brand,
-                    pharmacy: pharmacy
-                });
-            }
-        });
-    });
-    
-    window.positionChart = new Chart(positionCtx, {
-        type: 'scatter',
-        data: {
-            datasets: [{
-                label: 'Posições',
-                data: scatterData,
-                backgroundColor: scatterData.map(point => getPositionColor(point.position)),
-                borderColor: scatterData.map(point => 
-                    selectedProduct && point.brand === selectedProduct.brand ? '#1e3a8a' : '#333'
-                ),
-                borderWidth: scatterData.map(point => 
-                    selectedProduct && point.brand === selectedProduct.brand ? 2 : 1
-                ),
-                pointRadius: scatterData.map(point => 
-                    selectedProduct && point.brand === selectedProduct.brand ? 10 : 8
-                )
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const point = context.raw;
-                            return [
-                                `Marca: ${point.brand}`,
-                                `Site: ${point.pharmacy}`,
-                                `Posição: ${point.position}`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    position: 'bottom',
-                    min: -0.5,
-                    max: pharmacies.length - 0.5,
-                    ticks: {
-                        stepSize: 1,
-                        callback: function(value) {
-                            return pharmacies[value] || '';
-                        },
-                        font: {
-                            size: 12,
-                            weight: 'bold'
-                        }
-                    },
-                    grid: {
-                        display: false
-                    }
-                },
-                y: {
-                    type: 'linear',
-                    min: -0.5,
-                    max: brands.length - 0.5,
-                    ticks: {
-                        stepSize: 1,
-                        callback: function(value) {
-                            return brands[value] || '';
-                        },
-                        font: {
-                            size: 12,
-                            weight: 'bold'
-                        }
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            }
-        }
-    });
-    
-    document.getElementById('positionChart').onclick = function(evt) {
-        const points = window.positionChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
-        if (points.length) {
-            const point = points[0].raw;
-            const brandSelect = document.getElementById('brandSelect');
-            // Se já está selecionada, deseleciona
-            if (selectedProduct && selectedProduct.brand === point.brand) {
-                brandSelect.value = '';
-                selectedProduct = null;
-                renderPriceChart(allProducts);
-                renderPositionChart(allProducts);
-                document.getElementById('comparisonSection').style.display = 'none';
-                // Remover destaque na lista de produtos
-                document.querySelectorAll('.product-card.destaque-produto').forEach(el => {
-                    el.classList.remove('destaque-produto');
-                });
-            } else {
-                brandSelect.value = point.brand;
-                // Disparar o evento de change para atualizar análise
-                const event = new Event('change', { bubbles: true });
-                brandSelect.dispatchEvent(event);
-            }
-        }
-    };
-} 
+ 
 
 function downloadExcel() {
     if (!allProducts || allProducts.length === 0) {
