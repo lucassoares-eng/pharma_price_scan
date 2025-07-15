@@ -9,6 +9,15 @@ window.descontoBadgePlugin = {
         const dataset = chart.data.datasets[0];
         if (!dataset.discounts) return;
         ctx.save();
+        
+        // Desenhar título "★ Ranking" em cima das estrelas
+        ctx.font = 'bold 12px Segoe UI, Arial';
+        ctx.fillStyle = '#495057';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const titleX = chart.scales.x.left - 20;
+        const titleY = chart.chartArea.top - 10;
+        ctx.fillText('Ranking', titleX, titleY);
         chart.getDatasetMeta(0).data.forEach((bar, i) => {
             const discount = dataset.discounts[i];
             const price = dataset.data[i];
@@ -51,8 +60,8 @@ window.descontoBadgePlugin = {
                     const minPosition = Math.min(...positions);
                     const maxPosition = Math.max(...positions);
                     
-                    // Desenhar primeira estrela (maior posição) em cima da barra
-                    let starX = barStart + 12;
+                    // Desenhar primeira estrela (maior posição) próxima dos nomes
+                    let starX = maxPosition !== minPosition ? barStart - 35 : barStart - 25; // Centralizada quando uma estrela
                     let starY = maxPosition !== minPosition ? bar.y + 8 : bar.y; // No meio quando uma estrela, mais abaixo quando duas
                     
                     // Definir cor da primeira estrela baseada na maior posição
@@ -97,7 +106,7 @@ window.descontoBadgePlugin = {
                     
                     // Desenhar segunda estrela (menor posição) se for diferente da primeira
                     if (maxPosition !== minPosition) {
-                        starX = barStart + 12 + (starSpacing * 0.8); // Ajustado para sobreposição moderada
+                        starX = barStart - 35 + (starSpacing * 0.8); // Ajustado para sobreposição moderada
                         
                         // Definir cor da segunda estrela baseada na menor posição
                         let starColor2, textColor2;
@@ -276,6 +285,12 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
     document.querySelectorAll('.sort-btn').forEach(btn => {
         btn.onclick = function() {
             currentSort = this.getAttribute('data-sort');
+            
+            // Salvar estado atual da marca selecionada
+            const currentSelectedBrand = selectedProduct ? selectedProduct.brand : null;
+            const comparisonSection = document.getElementById('comparisonSection');
+            const wasComparisonVisible = comparisonSection && comparisonSection.style.display !== 'none';
+            
             renderListFn(products);
             if (renderChartFn) {
                 renderChartFn(products);
@@ -284,6 +299,27 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
                 }, 100);
             } else {
                 renderPositionChart(products);
+            }
+            
+            // Restaurar estado da marca selecionada se existia
+            if (currentSelectedBrand) {
+                selectedProduct = allProducts.find(p => p.brand === currentSelectedBrand);
+                if (selectedProduct) {
+                    // Atualizar seletor de marca
+                    const brandSelect = document.getElementById('brandSelect');
+                    if (brandSelect) {
+                        brandSelect.value = currentSelectedBrand;
+                    }
+                    
+                    // Manter análise comparativa visível
+                    if (wasComparisonVisible) {
+                        updatePositionComparison();
+                        document.getElementById('comparisonSection').style.display = 'block';
+                    }
+                    
+                    // Manter destaque dos cards
+                    highlightAllProductsOfBrand();
+                }
             }
         };
     });
@@ -613,17 +649,27 @@ function updatePositionComparison() {
     const priceDiff = selectedBrandAvg.avgPrice - avgAllBrands;
     const priceDiffText = priceDiff > 0 ? `+R$ ${priceDiff.toFixed(2)}` : `-R$ ${Math.abs(priceDiff).toFixed(2)}`;
     
+    // Calcular número de farmácias onde a marca foi encontrada
+    const brandProducts = allProducts.filter(p => p.brand === selectedProduct.brand);
+    const uniquePharmacies = [...new Set(brandProducts.map(p => p.pharmacy))];
+    const pharmacyCount = uniquePharmacies.length;
+    
+    // Calcular maior e menor preço da marca
+    const brandPrices = brandProducts.map(p => p.price).filter(price => typeof price === 'number' && price > 0);
+    const minPrice = Math.min(...brandPrices);
+    const maxPrice = Math.max(...brandPrices);
+    
     document.getElementById('positionInfo').innerHTML = `
         <div class="row g-3">
             <div class="col-12 col-md-6">
                 <strong>${selectedProduct.brand}</strong><br>
                 <span class="position-indicator ${positionClass}">${positionText}</span><br>
-                <small>Posição ${position} de ${totalBrands} marcas</small>
+                <small>${selectedBrandAvg.prices.length} produtos encontrados em ${pharmacyCount} farmácia${pharmacyCount > 1 ? 's' : ''}</small>
             </div>
             <div class="col-12 col-md-6">
                 <strong>Preço médio: R$ ${selectedBrandAvg.avgPrice.toFixed(2).replace('.', ',')}</strong><br>
-                <small>${priceDiffText} em relação à média geral</small><br>
-                <small>${selectedBrandAvg.prices.length} produtos encontrados</small>
+                <small><i class="fas fa-arrow-down text-success me-1"></i>Menor: R$ ${minPrice.toFixed(2).replace('.', ',')} | <i class="fas fa-arrow-up text-danger me-1"></i>Maior: R$ ${maxPrice.toFixed(2).replace('.', ',')}</small><br>
+                <small>${priceDiffText} em relação à média geral</small>
             </div>
         </div>
     `;
@@ -893,7 +939,7 @@ function renderPriceChart(products) {
                 padding: {
                     top: isMobile ? 10 : 20,
                     bottom: isMobile ? 10 : 20,
-                    left: 0,
+                    left: isMobile ? 25 : 35,
                     right: 0
                 }
             },
@@ -932,7 +978,7 @@ function renderPriceChart(products) {
                             weight: 'bold'
                         },
                         color: '#333',
-                        padding: isMobile ? 16 : 20
+                        padding: isMobile ? 35 : 45
                     }
                 }
             }
@@ -953,7 +999,7 @@ function renderPriceChart(products) {
         
         // Verificar se está na área das estrelas (lado esquerdo do gráfico)
         const chartArea = window.priceChart.chartArea;
-        if (x < chartArea.left + 60 && y > chartArea.top && y < chartArea.bottom) {
+        if (x < chartArea.left + 15 && y > chartArea.top && y < chartArea.bottom) {
             // Encontrar a marca correspondente baseada na posição Y
             const barHeight = (chartArea.bottom - chartArea.top) / window.priceChart.data.labels.length;
             const brandIndex = Math.floor((y - chartArea.top) / barHeight);
