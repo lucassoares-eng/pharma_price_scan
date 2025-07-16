@@ -665,8 +665,111 @@ function updatePositionComparison() {
     const minPrice = Math.min(...brandPrices);
     const maxPrice = Math.max(...brandPrices);
     
+    // Gerar cards para cada farmácia
+    let pharmacyCardsHtml = '';
+    brandProducts.forEach(product => {
+        // Encontrar produtos da mesma farmácia para comparação
+        const pharmacyProducts = allProducts.filter(p => p.pharmacy === product.pharmacy);
+        
+        // Contar produtos da marca selecionada nesta farmácia
+        const brandProductsInPharmacy = pharmacyProducts.filter(p => p.brand === selectedProduct.brand);
+        const productCount = brandProductsInPharmacy.length;
+        
+        // Encontrar produto mais barato da farmácia
+        const cheapestProduct = pharmacyProducts.reduce((cheapest, current) => {
+            if (typeof current.price === 'number' && current.price > 0) {
+                if (!cheapest || current.price < cheapest.price) {
+                    return current;
+                }
+            }
+            return cheapest;
+        }, null);
+        
+        // Encontrar produto melhor posicionado da farmácia
+        const bestPositionedProduct = pharmacyProducts.reduce((best, current) => {
+            if (current.position && current.position > 0) {
+                if (!best || current.position < best.position) {
+                    return current;
+                }
+            }
+            return best;
+        }, null);
+        
+        // Verificar se há produto mais barato e melhor posicionado
+        const hasBetterOption = cheapestProduct && bestPositionedProduct && 
+                               cheapestProduct.brand !== product.brand && 
+                               bestPositionedProduct.brand !== product.brand &&
+                               cheapestProduct.price < product.price &&
+                               bestPositionedProduct.position < product.position;
+        
+        const priceDisplay = typeof product.price === 'number' 
+            ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
+            : product.price;
+        const originalPriceDisplay = typeof product.original_price === 'number' 
+            ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
+            : product.original_price;
+        
+        pharmacyCardsHtml += `
+            <div class="col-6 col-md-4 col-lg-3 mb-2">
+                <div class="card pharmacy-detail-card ${hasBetterOption ? 'border-warning' : ''}">
+                    <div class="card-header d-flex align-items-center">
+                        <div class="pharmacy-logo me-1">
+                            ${product.pharmacy === 'Droga Raia' ? 
+                                '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img" style="width: 32px; height: 32px;">' :
+                                product.pharmacy === 'São João' ?
+                                '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img" style="width: 32px; height: 32px;">' :
+                                `<i class="fas fa-store logo-icon" style="font-size: 32px; color: #fff;" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
+                            }
+                        </div>
+                        <strong class="pharmacy-name">${product.pharmacy}</strong>
+                        ${hasBetterOption ? '<span class="badge bg-warning text-dark ms-auto"><i class="fas fa-exclamation-triangle"></i></span>' : ''}
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-1 mb-1">
+                            <div class="col-6">
+                                <small class="text-muted">Preço:</small><br>
+                                <strong class="text-primary price-text">${priceDisplay}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Posição:</small><br>
+                                <span class="badge bg-secondary">${product.position || 'N/A'}</span>
+                            </div>
+                        </div>
+                        <div class="row g-1 mb-1">
+                            <div class="col-12">
+                                <small class="text-muted">Produtos encontrados:</small><br>
+                                <span class="badge bg-info">${productCount} produto${productCount > 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+                        ${product.has_discount ? `
+                            <div class="row g-1 mb-1">
+                                <div class="col-6">
+                                    <small class="text-muted">Original:</small><br>
+                                    <span class="text-decoration-line-through text-muted small">${originalPriceDisplay}</span>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Desconto:</small><br>
+                                    <span class="badge bg-success">-${product.discount_percentage}%</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${hasBetterOption ? `
+                            <div class="alert alert-warning alert-sm mt-1 mb-0">
+                                <small>
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    <strong>${cheapestProduct.brand}</strong> mais barata<br>
+                                    <strong>${bestPositionedProduct.brand}</strong> melhor posição
+                                </small>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
     document.getElementById('positionInfo').innerHTML = `
-        <div class="row g-3">
+        <div class="row g-3 mb-4">
             <div class="col-12 col-md-6">
                 <strong>${selectedProduct.brand}</strong><br>
                 <span class="position-indicator ${positionClass}">${positionText}</span><br>
@@ -677,6 +780,10 @@ function updatePositionComparison() {
                 <small><i class="fas fa-arrow-down text-success me-1"></i>Menor: R$ ${minPrice.toFixed(2).replace('.', ',')} | <i class="fas fa-arrow-up text-danger me-1"></i>Maior: R$ ${maxPrice.toFixed(2).replace('.', ',')}</small><br>
                 <small>${priceDiffText} em relação à média geral</small>
             </div>
+        </div>
+        <h6 class="mb-3"><i class="fas fa-store me-2"></i>Detalhes por Farmácia</h6>
+        <div class="row g-2">
+            ${pharmacyCardsHtml}
         </div>
     `;
     
