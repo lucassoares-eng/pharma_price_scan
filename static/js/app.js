@@ -611,7 +611,7 @@ function updatePriceChart() {
     }
 }
 
-function updatePositionComparison() {
+async function updatePositionComparison() {
     if (!selectedProduct) return;
     
     // Calcular estatísticas por marca
@@ -665,6 +665,21 @@ function updatePositionComparison() {
     const minPrice = Math.min(...brandPrices);
     const maxPrice = Math.max(...brandPrices);
     
+    // Identificar farmácias analisadas
+    const pharmaciesAnalyzed = [...new Set(allProducts.map(p => p.pharmacy))];
+    
+    // Preparar dados de TODOS os produtos para enviar à IA
+    const allProductsData = allProducts.map(product => ({
+        name: product.name,
+        pharmacy: product.pharmacy,
+        price: product.price,
+        original_price: product.original_price,
+        has_discount: product.has_discount,
+        discount_percentage: product.discount_percentage,
+        position: product.position,
+        brand: product.brand
+    }));
+
     // Gerar cards para cada farmácia
     let pharmacyCardsHtml = '';
     brandProducts.forEach(product => {
@@ -767,7 +782,8 @@ function updatePositionComparison() {
             </div>
         `;
     });
-    
+
+    // Renderizar interface com spinner primeiro
     document.getElementById('positionInfo').innerHTML = `
         <div class="row g-3 mb-4">
             <div class="col-12 col-md-6">
@@ -781,11 +797,68 @@ function updatePositionComparison() {
                 <small>${priceDiffText} em relação à média geral</small>
             </div>
         </div>
+        <div class="ia-analysis-section">
+            <h6 class="mb-3"><i class="fas fa-robot me-2"></i>Análise Inteligente (Gemini IA)</h6>
+            <div class="ia-loading text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando análise...</span>
+                </div>
+                <p class="mt-2 text-muted">Gerando análise inteligente...</p>
+            </div>
+        </div>
         <h6 class="mb-3"><i class="fas fa-store me-2"></i>Detalhes por Farmácia</h6>
         <div class="row g-2">
             ${pharmacyCardsHtml}
         </div>
     `;
+
+    // Gerar análise com IA
+    let iaAnalysis = '';
+    try {
+        const requestData = {
+            brand: selectedProduct.brand,
+            position: position,
+            total_brands: totalBrands,
+            avg_price: selectedBrandAvg.avgPrice,
+            min_price: minPrice,
+            max_price: maxPrice,
+            pharmacy_count: pharmacyCount,
+            price_diff_text: priceDiffText,
+            pharmacies_analyzed: pharmaciesAnalyzed,
+            products_data: allProductsData
+        };
+        
+        console.log('Dados enviados para IA:', requestData);
+        console.log('Total de produtos enviados:', allProductsData.length);
+        
+        const response = await fetch('/api/pharma/ia/brand-analysis', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            iaAnalysis = `<div class="ia-summary alert alert-info mb-3"><i class="fas fa-robot me-1"></i>${data.analysis}</div>`;
+        } else {
+            console.error('Erro na análise de IA:', data.error);
+            iaAnalysis = `<div class="ia-summary alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Não foi possível gerar a análise inteligente. Erro: ${data.error}</div>`;
+        }
+    } catch (error) {
+        console.error('Erro ao chamar API de IA:', error);
+        iaAnalysis = `<div class="ia-summary alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Erro de conexão com o serviço de IA. Tente novamente.</div>`;
+    }
+
+    // Atualizar a seção de análise com o resultado
+    const iaSection = document.querySelector('.ia-analysis-section');
+    if (iaSection) {
+        iaSection.innerHTML = `
+            <h6 class="mb-3"><i class="fas fa-robot me-2"></i>Análise Inteligente (Gemini IA)</h6>
+            ${iaAnalysis}
+        `;
+    }
     
     document.getElementById('comparisonSection').style.display = 'block';
 }

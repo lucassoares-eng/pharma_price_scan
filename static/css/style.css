@@ -956,6 +956,79 @@ body {
     }
 }
 
+/* Estilos para análise de IA */
+.ia-analysis-section {
+    margin-bottom: 2rem;
+}
+
+.ia-summary {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border: 1px solid #2196f3;
+    color: #1565c0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.ia-summary i {
+    color: #1976d2;
+}
+
+.ia-loading {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 2rem;
+}
+
+.ia-loading .spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+.ia-loading p {
+    font-size: 0.9rem;
+    margin-top: 1rem;
+}
+
+@media (min-width: 768px) {
+    .ia-summary {
+        font-size: 1rem;
+        padding: 1.25rem;
+    }
+    
+    .ia-loading {
+        padding: 2.5rem;
+    }
+    
+    .ia-loading .spinner-border {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+}
+
+@media (max-width: 575px) {
+    .ia-summary {
+        font-size: 0.85rem;
+        padding: 0.75rem;
+    }
+    
+    .ia-loading {
+        padding: 1.5rem;
+    }
+    
+    .ia-loading .spinner-border {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+    
+    .ia-loading p {
+        font-size: 0.8rem;
+    }
+}
+
 /* Ajustes para telas muito pequenas */
 @media (max-width: 375px) {
     .pharmacy-detail-card {
@@ -978,6 +1051,11 @@ body {
     
     .pharmacy-detail-card .price-text {
         font-size: 0.8rem;
+    }
+    
+    .ia-summary {
+        font-size: 0.8rem;
+        padding: 0.6rem;
     }
 }
 

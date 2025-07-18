@@ -16,6 +16,9 @@ from utils.product_unifier import unify_pharmacy_results
 # Importar o gerenciador de cache
 from utils.cache_manager import CacheManager
 
+# Importar a integração com Gemini AI
+from utils.gemini_ai import GeminiAI
+
 # Variável global para o driver
 global_driver = None
 
@@ -309,6 +312,41 @@ def clear_cache():
         return jsonify({'message': 'Cache expirado limpo com sucesso'})
     except Exception as e:
         return jsonify({'error': f'Erro ao limpar cache: {str(e)}'}), 500
+
+@pharma_api.route('/ia/brand-analysis', methods=['POST'])
+def brand_analysis():
+    """Endpoint para análise de marca usando IA"""
+    try:
+        data = request.get_json()
+        
+        # Validar dados obrigatórios
+        required_fields = ['brand', 'position', 'total_brands', 'avg_price', 'min_price', 'max_price', 'pharmacy_count', 'price_diff_text']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Campo obrigatório não encontrado: {field}'}), 400
+        
+        # Adicionar dados dos produtos se disponível
+        if 'products_data' not in data:
+            data['products_data'] = []
+        
+        # Inicializar Gemini AI
+        try:
+            gemini_ai = GeminiAI()
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 500
+        
+        # Gerar análise
+        analysis_text = gemini_ai.generate_brand_analysis(data)
+        
+        return jsonify({
+            'success': True,
+            'analysis': analysis_text,
+            'brand': data['brand']
+        })
+        
+    except Exception as e:
+        print(f"Erro na análise de marca: {e}")
+        return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
 
 # Criar blueprint para as rotas da interface web
 pharma_web = Blueprint('pharma_web', __name__)
