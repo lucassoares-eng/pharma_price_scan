@@ -152,6 +152,7 @@ class ProductUnifier:
                 return {
                     'standardized_name': product_name,
                     'laboratory': self._lab_format(found_lab_in_name),
+                    'brand': self._lab_format(found_lab_in_name),
                     'original_brand': product_brand,
                     'similarity_score': 1.0,
                     'match_type': 'no_brand'
@@ -160,6 +161,7 @@ class ProductUnifier:
                 return {
                     'standardized_name': product_name,
                     'laboratory': "",
+                    'brand': "",
                     'original_brand': product_brand,
                     'similarity_score': 1.0,
                     'match_type': 'no_brand'

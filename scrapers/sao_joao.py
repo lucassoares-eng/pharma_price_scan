@@ -158,9 +158,6 @@ class SaoJoaoScraper(BaseScraper):
                 normalized_name = name.lower().strip()
                 normalized_search = search_term.lower().strip()
                 first_word = normalized_name.split()[0] if normalized_name.split() else ""
-                # Só busca página específica se:
-                # 1. name inicia com molécula buscada
-                # 2. ProductUnifier não encontra laboratório
                 found_lab = self.product_unifier.find_best_match(
                     product_name=name,
                     product_brand="",
@@ -173,9 +170,12 @@ class SaoJoaoScraper(BaseScraper):
                     brand = self._extract_brand_from_product_page(product_link)
                 else:
                     # Não buscar página específica, usar resultado do unifier se houver
-                    brand = found_lab_name or "Marca não disponível"
+                    brand = found_lab_name or None
             else:
-                brand = "Marca não disponível"
+                brand = None if brand == "Marca não disponível" else brand
+            # Se brand ainda for None, buscar na página específica do produto
+            if not brand and product_link:
+                brand = self._extract_brand_from_product_page(product_link)
             product_data = {
                 'name': name,
                 'brand': brand,
