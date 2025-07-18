@@ -11,10 +11,43 @@ import platform
 from scrapers.base_scraper import get_chrome_version, get_chromedriver_url, update_chromedriver, get_os_type
 
 # Importar o unificador de produtos
-from utils.product_unifier import unify_pharmacy_results
+from utils.product_unifier import ProductUnifier
 
 # Importar o gerenciador de cache
 from utils.cache_manager import CacheManager
+
+# Inicializar ProductUnifier global
+product_unifier = ProductUnifier()
+
+def process_pharmacy_results(results, search_term=""):
+    """Processa resultados de farmácias usando o novo ProductUnifier"""
+    processed_results = {}
+    
+    for pharmacy_name, pharmacy_data in results.items():
+        if 'products' in pharmacy_data and pharmacy_data['products']:
+            # Processar produtos de cada farmácia individualmente com o termo de busca
+            processed_products = product_unifier.standardize_product_list(pharmacy_data['products'], search_term)
+            
+            # Criar resultado processado
+            processed_data = pharmacy_data.copy()
+            processed_data['products'] = processed_products
+            
+            # Adicionar estatísticas de padronização
+            total_products = len(processed_products)
+            standardized_count = sum(1 for p in processed_products if p.get('is_standardized', False))
+            
+            processed_data['standardization_stats'] = {
+                'total_products': total_products,
+                'standardized_products': standardized_count,
+                'standardization_rate': (standardized_count / total_products * 100) if total_products > 0 else 0
+            }
+            
+            processed_results[pharmacy_name] = processed_data
+        else:
+            # Manter dados originais se não há produtos
+            processed_results[pharmacy_name] = pharmacy_data
+    
+    return processed_results
 
 # Importar a integração com Gemini AI
 from utils.gemini_ai import GeminiAI
@@ -138,13 +171,13 @@ def search_medicines():
             # Cache encontrado e válido - usar dados do cache
             print(f"Usando cache para busca: {medicine_description}")
             
-            # Unificar produtos semelhantes (sempre refazer a unificação)
-            unified_results = unify_pharmacy_results(cached_results, similarity_threshold=0.7)
+            # Processar produtos com ProductUnifier
+            processed_results = process_pharmacy_results(cached_results, medicine_description)
             
             return jsonify({
                 'medicine_description': medicine_description,
                 'results': cached_results,
-                'unified_results': unified_results,
+                'processed_results': processed_results,
                 'from_cache': True
             })
         
@@ -189,16 +222,16 @@ def search_medicines():
                     }
                     break
         
-        # Salvar resultados no cache (apenas os dados das farmácias, sem unificação)
+        # Salvar resultados no cache (apenas os dados das farmácias, sem processamento)
         cache_mgr.save_cache_results(medicine_description, results)
         
-        # Unificar produtos semelhantes
-        unified_results = unify_pharmacy_results(results, similarity_threshold=0.7)
+        # Processar produtos com ProductUnifier
+        processed_results = process_pharmacy_results(results, medicine_description)
         
         return jsonify({
             'medicine_description': medicine_description,
             'results': results,
-            'unified_results': unified_results,
+            'processed_results': processed_results,
             'from_cache': False
         })
         
@@ -225,10 +258,10 @@ def search_medicines_unified():
             # Cache encontrado e válido - usar dados do cache
             print(f"Usando cache para busca unificada: {medicine_description}")
             
-            # Unificar produtos semelhantes (sempre refazer a unificação)
-            unified_results = unify_pharmacy_results(cached_results, similarity_threshold=0.7)
+            # Processar produtos com ProductUnifier
+            processed_results = process_pharmacy_results(cached_results, medicine_description)
             
-            return jsonify(unified_results)
+            return jsonify(processed_results)
         
         # Cache não encontrado ou expirado - fazer nova busca
         print(f"Fazendo nova busca unificada para: {medicine_description}")
@@ -271,13 +304,13 @@ def search_medicines_unified():
                     }
                     break
         
-        # Salvar resultados no cache (apenas os dados das farmácias, sem unificação)
+        # Salvar resultados no cache (apenas os dados das farmácias, sem processamento)
         cache_mgr.save_cache_results(medicine_description, results)
         
-        # Unificar produtos semelhantes
-        unified_results = unify_pharmacy_results(results, similarity_threshold=0.7)
+        # Processar produtos com ProductUnifier
+        processed_results = process_pharmacy_results(results, medicine_description)
         
-        return jsonify(unified_results)
+        return jsonify(processed_results)
         
     except Exception as e:
         return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500

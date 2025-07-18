@@ -6,6 +6,7 @@ from urllib.parse import quote_plus
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from utils.product_unifier import ProductUnifier
 
 # Configuração básica de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -21,45 +22,29 @@ class SaoJoaoScraper(BaseScraper):
             pharmacy_name="São João",
             driver=driver
         )
-    
+        self.product_unifier = ProductUnifier()  # Instância única
+
     def search(self, medicine_description):
         """
         Busca medicamentos no site São João
-        
-        Args:
-            medicine_description (str): Descrição do medicamento a ser buscado
-            
-        Returns:
-            dict: Resultados da busca com produtos encontrados
         """
         try:
-            # Preparar a query de busca
             url = self.create_search_url(medicine_description)
             self.logger.info(f"Buscando URL: {url}")
-            
-            # Fazer a requisição usando Selenium
             response = self.make_request(url)
-            
-            # Parsear o HTML
             soup = self.parse_html(response)
-            
-            # Extrair produtos
-            products = self._extract_products(soup)
+            products = self._extract_products(soup, medicine_description)
             self.logger.info(f"Produtos encontrados: {len(products)}")
-
-            # Ordenar produtos do menor para o maior preço
             products = sorted(
                 products,
                 key=lambda p: p['price'] if isinstance(p['price'], (int, float)) else float('inf')
             )
-            
             return self.format_response(products, url)
         except Exception as e:
             self.logger.error(f"Erro inesperado: {e}")
             return self.format_response([], "", f'Erro inesperado: {str(e)}')
-        # Garantia extra: nunca retorna None
         return self.format_response([], "", "Erro desconhecido")
-    
+
     def create_search_url(self, medicine_description):
         """
         Cria a URL de busca específica para o São João
@@ -119,82 +104,78 @@ class SaoJoaoScraper(BaseScraper):
             # Retornar HTML vazio em caso de erro
             return "<html><body></body></html>"
     
-    def _extract_products(self, soup):
+    def _extract_products(self, soup, search_term):
         """
         Extrai produtos do HTML parseado
-        
-        Args:
-            soup (BeautifulSoup): HTML parseado
-            
-        Returns:
-            list: Lista de produtos extraídos
         """
-        # Encontrar o container de produtos (gallery)
         products_container = soup.find('div', class_='vtex-search-result-3-x-gallery')
-        
         if not products_container:
             self.logger.warning("Container de produtos não encontrado no HTML.")
             self.logger.debug(f"HTML da página (primeiros 1000 chars):\n{str(soup)[:1000]}")
             return []
-        
-        # Extrair produtos
         products = []
         product_sections = products_container.find_all('section', class_='vtex-product-summary-2-x-container')
         self.logger.info(f"Quantidade de seções de produtos encontradas: {len(product_sections)}")
-        
         for idx, section in enumerate(product_sections, 1):
             try:
-                product = self._extract_product_info(section, idx)
+                product = self._extract_product_info(section, idx, search_term)
                 if product:
                     products.append(product)
             except Exception as e:
                 self.logger.error(f"Erro ao extrair produto: {e}")
                 continue
-        
         return products
-    
-    def _extract_product_info(self, section, position=None):
+
+    def _extract_product_info(self, section, position=None, search_term=None):
         """
         Extrai informações de um produto do HTML
-        
-        Args:
-            section: Elemento HTML da seção do produto
-            
-        Returns:
-            dict: Informações do produto ou None se não conseguir extrair
         """
         try:
             # Nome do produto
             name_element = section.find('span', class_='vtex-product-summary-2-x-productBrand')
             name = name_element.get_text(strip=True) if name_element else "Nome não disponível"
-            
             # Link do produto
             product_link = ""
             link_element = section.find('a', class_='vtex-product-summary-2-x-clearLink')
             if link_element:
                 product_link = self.base_url + link_element.get('href', '')
-            
-            # Extrair marca correta da página do produto
-            brand = self._extract_brand_from_product_page(product_link)
-            
             # Descrição/Quantidade - extrair do nome
             description = ""
             if name:
-                # Tentar extrair quantidade e forma farmacêutica
                 desc_match = re.search(r'(\d+mg?\s+\d+\s+\w+)', name)
                 if desc_match:
                     description = desc_match.group(1)
-            
             # Preço
             price_info = self._extract_price(section)
-            
             # Imagem do produto
             img_element = section.find('img', class_='vtex-product-summary-2-x-image')
             image_url = img_element.get('src', '') if img_element else ""
-            
             # Verificar se há desconto
             discount_info = self._extract_discount_info(section)
-            
+            # --- Lógica de busca condicional ---
+            brand = "Marca não disponível"
+            if name and search_term:
+                normalized_name = name.lower().strip()
+                normalized_search = search_term.lower().strip()
+                first_word = normalized_name.split()[0] if normalized_name.split() else ""
+                # Só busca página específica se:
+                # 1. name inicia com molécula buscada
+                # 2. ProductUnifier não encontra laboratório
+                found_lab = self.product_unifier.find_best_match(
+                    product_name=name,
+                    product_brand="",
+                    product_description=description,
+                    search_term=search_term
+                )
+                found_lab_name = found_lab['laboratory'] if found_lab and found_lab.get('laboratory') else ""
+                if first_word == normalized_search.split()[0] and not found_lab_name:
+                    # Buscar página específica
+                    brand = self._extract_brand_from_product_page(product_link)
+                else:
+                    # Não buscar página específica, usar resultado do unifier se houver
+                    brand = found_lab_name or "Marca não disponível"
+            else:
+                brand = "Marca não disponível"
             product_data = {
                 'name': name,
                 'brand': brand,
@@ -207,7 +188,6 @@ class SaoJoaoScraper(BaseScraper):
                 'position': position
             }
             return product_data
-            
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
             return None

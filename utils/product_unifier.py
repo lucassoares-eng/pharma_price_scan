@@ -1,24 +1,38 @@
 import re
-from difflib import SequenceMatcher
-from typing import List, Dict, Any, Tuple
+import csv
 import logging
+from typing import List, Dict, Any, Optional
+from difflib import SequenceMatcher
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ProductUnifier:
-    """Classe para unificar produtos semelhantes de diferentes farmácias"""
+    """Classe para padronizar nomes de produtos comparando com lista de laboratórios"""
     
-    def __init__(self, similarity_threshold: float = 0.7):
+    def __init__(self, brands_file_path: str = "static/laboratorios.csv"):
+        self.brands_file_path = brands_file_path
+        self.laboratories = self._load_laboratories()
+        self.similarity_threshold = 0.5
+
+    def _load_laboratories(self) -> set:
         """
-        Inicializa o unificador de produtos
-        
-        Args:
-            similarity_threshold: Limiar de similaridade para considerar produtos iguais (0.0 a 1.0)
+        Carrega laboratórios únicos do arquivo CSV
         """
-        self.similarity_threshold = similarity_threshold
-    
+        laboratories = set()
+        try:
+            with open(self.brands_file_path, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    lab = row.get('laboratorio', '').strip()
+                    if lab:
+                        laboratories.add(lab)
+            logger.info(f"Carregados {len(laboratories)} laboratórios da lista")
+        except Exception as e:
+            logger.error(f"Erro ao carregar arquivo de laboratórios: {e}")
+        return laboratories
+
     def normalize_text(self, text: str) -> str:
         """
         Normaliza texto para comparação
@@ -51,257 +65,230 @@ class ProductUnifier:
         
         return text.strip()
     
-    def extract_key_info(self, product: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Extrai informações-chave do produto para comparação
-        
-        Args:
-            product: Dicionário do produto
-            
-        Returns:
-            Dicionário com informações-chave normalizadas
-        """
-        name = self.normalize_text(product.get('name', ''))
-        brand = self.normalize_text(product.get('brand', ''))
-        description = self.normalize_text(product.get('description', ''))
-        
-        # Extrair informações específicas de medicamentos
-        dosage = ""
-        quantity = ""
-        
-        # Padrões para extrair dosagem e quantidade
-        dosage_patterns = [
-            r'(\d+)\s*mg',
-            r'(\d+)\s*mcg',
-            r'(\d+)\s*g',
-            r'(\d+)\s*ml',
-        ]
-        
-        quantity_patterns = [
-            r'(\d+)\s*comprimidos?',
-            r'(\d+)\s*capsulas?',
-            r'(\d+)\s*tablets?',
-            r'(\d+)\s*ml',
-            r'(\d+)\s*gotas?',
-        ]
-        
-        # Buscar dosagem
-        for pattern in dosage_patterns:
-            match = re.search(pattern, name + ' ' + description)
-            if match:
-                dosage = match.group(1)
-                break
-        
-        # Buscar quantidade
-        for pattern in quantity_patterns:
-            match = re.search(pattern, name + ' ' + description)
-            if match:
-                quantity = match.group(1)
-                break
-        
-        return {
-            'name': name,
-            'brand': brand,
-            'description': description,
-            'dosage': dosage,
-            'quantity': quantity
-        }
+    def identify_brand_from_name(self, product_name: str, search_term: str = "") -> str:
+        if not product_name:
+            return ""
+        # Marca: apenas a primeira palavra do nome original, preservando hífens e capitalização
+        original_words = product_name.split()
+        def smart_capitalize(word):
+            return '-'.join([w.capitalize() for w in word.split('-')])
+        composed_brand = smart_capitalize(original_words[0])
+        normalized_name = self.normalize_text(product_name)
+        words = normalized_name.split()
+        if not words:
+            return ""
+        first_word = words[0]
+        if search_term:
+            normalized_search = self.normalize_text(search_term)
+            search_words = normalized_search.split()
+            # Só busca laboratório no nome se o produto começa com a molécula buscada
+            if search_words and first_word == search_words[0]:
+                for laboratory in self.laboratories:
+                    normalized_laboratory = self.normalize_text(laboratory)
+                    if normalized_laboratory in normalized_name:
+                        return laboratory  # Retorna exatamente como no CSV
+                    elif len(normalized_laboratory) > 3:
+                        lab_words = normalized_laboratory.split()
+                        if len(lab_words) >= 2:
+                            found_words = sum(1 for word in lab_words if word in normalized_name)
+                            if found_words >= 2:
+                                return laboratory
+                return composed_brand
+            else:
+                return composed_brand
+        else:
+            return composed_brand
+
+    def _lab_format(self, lab: str) -> str:
+        words = [w for w in lab.replace('-', ' ').split() if w]
+        if any(len(w) <= 3 for w in words):
+            return lab.upper()
+        else:
+            return ' '.join([w.capitalize() for w in lab.split()])
+
+    def _word_in_text(self, word, text):
+        return re.search(r'\b' + re.escape(word) + r'\b', text) is not None
+
+    def _is_similar(self, a: str, b: str, threshold: float = 0.8) -> bool:
+        return SequenceMatcher(None, a, b).ratio() >= threshold
+
+    def _first_word_brand(self, name: str) -> str:
+        # Retorna a primeira palavra do nome original, preservando hífens e capitalização
+        if not name:
+            return ""
+        first = name.split()[0]
+        return '-'.join([w.capitalize() for w in first.split('-')])
+
+    def find_best_match(self, product_name: str, product_brand: str = "", product_description: str = "", search_term: str = "") -> Optional[Dict[str, str]]:
+        normalized_name = self.normalize_text(product_name)
+        normalized_brand = self.normalize_text(product_brand)
+        normalized_description = self.normalize_text(product_description)
+        found_lab_in_name = None
+        stopwords = set([
+            'farma', 'generico', 'genérico', 'lab', 'laboratorio', 'laboratório', 'farmaceutica', 'farmacêutica', 'pharma', 'pharmaceutical', 'com', 'ind', 'indústria', 'industria', 'sa', 's/a', 'sa.', 's.a.'
+        ])
+        if search_term:
+            normalized_search = self.normalize_text(search_term)
+            search_words = normalized_search.split()
+            words = normalized_name.split()
+            # Se a primeira palavra do termo de busca for similar à primeira do nome, busca laboratório em todo o nome
+            if search_words and words and self._is_similar(words[0], search_words[0]):
+                for laboratory in self.laboratories:
+                    normalized_laboratory = self.normalize_text(laboratory)
+                    lab_words = normalized_laboratory.split()
+                    for lab_word in lab_words:
+                        if len(lab_word) >= 3 and lab_word not in stopwords and self._word_in_text(lab_word, normalized_name):
+                            found_lab_in_name = laboratory
+                            break
+                    if found_lab_in_name:
+                        break
+        if found_lab_in_name:
+            return {
+                'standardized_name': product_name,
+                'laboratory': self._lab_format(found_lab_in_name),
+                'similarity_score': 1.0,
+                'match_type': 'laboratory_in_name'
+            }
+        best_match = None
+        found_laboratory_in_description = None
+        if normalized_description:
+            for laboratory in self.laboratories:
+                normalized_laboratory = self.normalize_text(laboratory)
+                lab_words = normalized_laboratory.split()
+                for lab_word in lab_words:
+                    if len(lab_word) >= 3 and lab_word not in stopwords and self._word_in_text(lab_word, normalized_description):
+                        found_laboratory_in_description = laboratory
+                        break
+                if found_laboratory_in_description:
+                    break
+        if found_laboratory_in_description:
+            best_match = {
+                'standardized_name': product_name,
+                'laboratory': self._lab_format(found_laboratory_in_description),
+                'similarity_score': 1.0,
+                'match_type': 'laboratory_in_description'
+            }
+        else:
+            best_match = {
+                'standardized_name': product_name,
+                'laboratory': self._first_word_brand(product_name),
+                'similarity_score': 1.0,
+                'match_type': 'brand_identified'
+            }
+        return best_match
     
-    def calculate_similarity(self, product1: Dict[str, Any], product2: Dict[str, Any]) -> float:
+    def standardize_product_list(self, products: List[Dict[str, Any]], search_term: str = "") -> List[Dict[str, Any]]:
         """
-        Calcula a similaridade entre dois produtos
+        Padroniza uma lista de produtos comparando com a lista de marcas
         
         Args:
-            product1: Primeiro produto
-            product2: Segundo produto
+            products: Lista de produtos a serem padronizados
             
         Returns:
-            Score de similaridade (0.0 a 1.0)
+            Lista de produtos com nomes padronizados
         """
-        info1 = self.extract_key_info(product1)
-        info2 = self.extract_key_info(product2)
+        standardized_products = []
         
-        # Pesos para diferentes campos
-        weights = {
-            'name': 0.4,
-            'brand': 0.3,
-            'description': 0.2,
-            'dosage': 0.05,
-            'quantity': 0.05
-        }
-        
-        total_score = 0.0
-        total_weight = 0.0
-        
-        for field, weight in weights.items():
-            if info1[field] and info2[field]:
-                # Calcular similaridade usando SequenceMatcher
-                similarity = SequenceMatcher(None, info1[field], info2[field]).ratio()
+        for product in products:
+            try:
+                # Criar cópia do produto para não modificar o original
+                standardized_product = product.copy()
                 
-                # Bônus para correspondência exata
-                if info1[field] == info2[field]:
-                    similarity = 1.0
+                # Buscar correspondência na lista de marcas
+                match = self.find_best_match(
+                    product.get('name', ''),
+                    product.get('brand', ''),
+                    product.get('description', ''),
+                    search_term # Passar o search_term para o find_best_match
+                )
                 
-                total_score += similarity * weight
-                total_weight += weight
+                if match:
+                    # Produto encontrado na lista de marcas
+                    standardized_product['standardized_name'] = match['standardized_name']
+                    standardized_product['laboratory'] = match['laboratory']
+                    standardized_product['similarity_score'] = match['similarity_score']
+                    standardized_product['match_type'] = match.get('match_type', 'unknown')
+                    standardized_product['is_standardized'] = True
+                else:
+                    # Produto não encontrado na lista de marcas
+                    standardized_product['standardized_name'] = product.get('name', '')
+                    standardized_product['laboratory'] = product.get('brand', '')
+                    standardized_product['similarity_score'] = 0.0
+                    standardized_product['match_type'] = 'not_found'
+                    standardized_product['is_standardized'] = False
+                
+                standardized_products.append(standardized_product)
+                
+            except Exception as e:
+                logger.error(f"Erro ao padronizar produto {product.get('name', 'N/A')}: {e}")
+                # Adicionar produto sem padronização em caso de erro
+                product_copy = product.copy()
+                product_copy['standardized_name'] = product.get('name', '')
+                product_copy['laboratory'] = product.get('brand', '')
+                product_copy['similarity_score'] = 0.0
+                product_copy['match_type'] = 'error'
+                product_copy['is_standardized'] = False
+                standardized_products.append(product_copy)
         
-        # Se não há campos para comparar, retornar 0
-        if total_weight == 0:
-            return 0.0
-        
-        return total_score / total_weight
+        return standardized_products
     
-    def find_similar_products(self, products: List[Dict[str, Any]]) -> List[List[int]]:
+    def process_scraper_results(self, scraper_results: Dict[str, Any], search_term: str = "") -> Dict[str, Any]:
         """
-        Encontra grupos de produtos semelhantes
+        Processa resultados de um scraper e padroniza os produtos
         
         Args:
-            products: Lista de produtos
+            scraper_results: Resultados do scraper
+            search_term: Termo de busca usado no scraper
             
         Returns:
-            Lista de grupos (cada grupo é uma lista de índices)
-        """
-        groups = []
-        used_indices = set()
-        
-        for i in range(len(products)):
-            if i in used_indices:
-                continue
-            
-            current_group = [i]
-            used_indices.add(i)
-            
-            for j in range(i + 1, len(products)):
-                if j in used_indices:
-                    continue
-                
-                similarity = self.calculate_similarity(products[i], products[j])
-                
-                if similarity >= self.similarity_threshold:
-                    current_group.append(j)
-                    used_indices.add(j)
-            
-            if len(current_group) > 1:
-                groups.append(current_group)
-        
-        return groups
-    
-    def unify_products(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Unifica produtos semelhantes de diferentes farmácias
-        
-        Args:
-            results: Resultados das buscas das farmácias
-            
-        Returns:
-            Resultados unificados
+            Resultados com produtos padronizados
         """
         try:
-            # Coletar todos os produtos de todas as farmácias
-            all_products = []
-            pharmacy_mapping = {}  # Mapeia índice do produto para farmácia
+            # Verificar se há produtos nos resultados
+            if 'products' not in scraper_results or not scraper_results['products']:
+                logger.warning("Nenhum produto encontrado nos resultados do scraper")
+                return scraper_results
             
-            for pharmacy_name, pharmacy_data in results.items():
-                if 'products' in pharmacy_data and isinstance(pharmacy_data['products'], list):
-                    for product in pharmacy_data['products']:
-                        # Adicionar informação da farmácia ao produto
-                        product_with_pharmacy = product.copy()
-                        product_with_pharmacy['pharmacy'] = pharmacy_name
-                        product_with_pharmacy['pharmacy_display_name'] = pharmacy_data.get('pharmacy', pharmacy_name)
-                        
-                        all_products.append(product_with_pharmacy)
-                        pharmacy_mapping[len(all_products) - 1] = pharmacy_name
+            # Adicionar search_term aos produtos para uso na padronização
+            for product in scraper_results['products']:
+                product['search_term'] = search_term
             
-            if not all_products:
-                return results
+            # Padronizar produtos
+            standardized_products = self.standardize_product_list(scraper_results['products'], search_term)
             
-            # Encontrar grupos de produtos semelhantes
-            similar_groups = self.find_similar_products(all_products)
+            # Criar resultado padronizado
+            standardized_results = scraper_results.copy()
+            standardized_results['products'] = standardized_products
             
-            # Criar produtos unificados
-            unified_products = []
+            # Adicionar estatísticas de padronização
+            total_products = len(standardized_products)
+            standardized_count = sum(1 for p in standardized_products if p.get('is_standardized', False))
             
-            # Processar produtos que não foram agrupados
-            processed_indices = set()
-            for group in similar_groups:
-                processed_indices.update(group)
-            
-            # Adicionar produtos não agrupados
-            for i, product in enumerate(all_products):
-                if i not in processed_indices:
-                    unified_products.append({
-                        'unified_name': product['name'],
-                        'unified_brand': product['brand'],
-                        'unified_description': product['description'],
-                        'variants': [product],
-                        'best_price': product['price'],
-                        'best_price_pharmacy': product['pharmacy'],
-                        'has_discount': product.get('has_discount', False),
-                        'total_variants': 1
-                    })
-            
-            # Processar grupos de produtos semelhantes
-            for group in similar_groups:
-                if len(group) == 0:
-                    continue
-                
-                group_products = [all_products[i] for i in group]
-                
-                # Encontrar o produto com melhor preço
-                best_price_product = min(group_products, key=lambda p: p['price'])
-                
-                # Criar nome unificado (usar o mais descritivo)
-                names = [p['name'] for p in group_products]
-                unified_name = max(names, key=len)  # Usar o nome mais longo
-                
-                # Criar marca unificada
-                brands = [p['brand'] for p in group_products if p.get('brand')]
-                unified_brand = brands[0] if brands else ""
-                
-                # Criar descrição unificada
-                descriptions = [p['description'] for p in group_products if p.get('description')]
-                unified_description = descriptions[0] if descriptions else ""
-                
-                unified_products.append({
-                    'unified_name': unified_name,
-                    'unified_brand': unified_brand,
-                    'unified_description': unified_description,
-                    'variants': group_products,
-                    'best_price': best_price_product['price'],
-                    'best_price_pharmacy': best_price_product['pharmacy'],
-                    'has_discount': any(p.get('has_discount', False) for p in group_products),
-                    'total_variants': len(group_products)
-                })
-            
-            # Ordenar por melhor preço
-            unified_products.sort(key=lambda p: p['best_price'])
-            
-            # Criar resultado unificado
-            unified_results = {
-                'medicine_description': results.get('medicine_description', ''),
-                'unified_products': unified_products,
-                'total_unified_products': len(unified_products),
-                'original_results': results  # Manter resultados originais para referência
+            standardized_results['standardization_stats'] = {
+                'total_products': total_products,
+                'standardized_products': standardized_count,
+                'standardization_rate': (standardized_count / total_products * 100) if total_products > 0 else 0
             }
             
-            logger.info(f"Unificados {len(all_products)} produtos em {len(unified_products)} grupos")
+            logger.info(f"Padronização concluída: {standardized_count}/{total_products} produtos padronizados")
             
-            return unified_results
+            return standardized_results
             
         except Exception as e:
-            logger.error(f"Erro ao unificar produtos: {e}")
-            return results
+            logger.error(f"Erro ao processar resultados do scraper: {e}")
+            return scraper_results
 
-def unify_pharmacy_results(results: Dict[str, Any], similarity_threshold: float = 0.7) -> Dict[str, Any]:
+# Função de conveniência para uso direto
+def standardize_products(products: List[Dict[str, Any]], brands_file_path: str = "static/lista_marcas.csv") -> List[Dict[str, Any]]:
     """
-    Função de conveniência para unificar resultados de farmácias
+    Função de conveniência para padronizar produtos
     
     Args:
-        results: Resultados das buscas das farmácias
-        similarity_threshold: Limiar de similaridade
+        products: Lista de produtos a serem padronizados
+        brands_file_path: Caminho para o arquivo CSV com lista de marcas
         
     Returns:
-        Resultados unificados
+        Lista de produtos com nomes padronizados
     """
-    unifier = ProductUnifier(similarity_threshold=similarity_threshold)
-    return unifier.unify_products(results) 
+    unifier = ProductUnifier(brands_file_path)
+    return unifier.standardize_product_list(products) 

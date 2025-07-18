@@ -1,68 +1,51 @@
 #!/usr/bin/env python3
 """
-Teste do scraper São João
+Teste do scraper SaoJoaoScraper com busca por 'ibuprofone 600mg 20 comprimidos'
 """
-
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from scrapers.sao_joao import SaoJoaoScraper
 import json
+from scrapers.sao_joao import SaoJoaoScraper
+from utils.product_unifier import ProductUnifier
 
-def test_sao_joao_scraper():
-    """Testa o scraper São João com um medicamento específico"""
+# Adicionar o diretório raiz ao path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def main():
+    print("=== Teste: SaoJoaoScraper + ProductUnifier ===")
+    search_term = "ibuprofone 600mg 20 comprimidos"
+    print(f"Buscando: {search_term}\n")
     
-    print("Iniciando teste do scraper São João...")
+    # Inicializar scraper e driver (assume que Selenium está configurado)
+    scraper = SaoJoaoScraper()
+    results = scraper.search(search_term)
     
-    try:
-        # Criar instância do scraper
-        scraper = SaoJoaoScraper()
-        
-        # Testar busca
-        medicine = "ibuprofeno 600mg 20"
-        print(f"Buscando: {medicine}")
-        
-        result = scraper.search(medicine)
-        
-        # Salvar HTML para análise
-        if hasattr(scraper, 'driver') and scraper.driver:
-            with open('sao_joao_debug.html', 'w', encoding='utf-8') as f:
-                f.write(scraper.driver.page_source)
-            print("HTML da página salvo em: sao_joao_debug.html")
-        
-        # Exibir resultados
-        print(f"\nResultados da busca:")
-        print(f"Farmácia: {result.get('pharmacy', 'N/A')}")
-        print(f"URL: {result.get('url', 'N/A')}")
-        print(f"Total de produtos: {result.get('total_products', 0)}")
-        
-        if result.get('error'):
-            print(f"Erro: {result['error']}")
-        else:
-            print(f"\nProdutos encontrados:")
-            for i, product in enumerate(result.get('products', []), 1):
-                print(f"\n{i}. {product.get('name', 'N/A')}")
-                print(f"   Marca: {product.get('brand', 'N/A')}")
-                print(f"   Preço: R$ {product.get('price', 'N/A')}")
-                print(f"   Preço original: R$ {product.get('original_price', 'N/A')}")
-                print(f"   Desconto: {product.get('discount_percentage', 0)}%")
-                print(f"   URL: {product.get('product_url', 'N/A')}")
-        
-        # Salvar resultado em JSON para análise
-        with open('sao_joao_test_result.json', 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-        print(f"\nResultado salvo em: sao_joao_test_result.json")
-        
-    except Exception as e:
-        print(f"Erro durante o teste: {e}")
-        import traceback
-        traceback.print_exc()
+    print(f"Produtos encontrados: {len(results.get('products', []))}")
+    for i, product in enumerate(results.get('products', [])):
+        print(f"\nProduto {i+1}:")
+        print(f"  Nome: {product.get('name')}")
+        print(f"  Marca extraída: {product.get('brand')}")
+        print(f"  Descrição: {product.get('description')}")
+        print(f"  URL: {product.get('product_url')}")
+        print(f"  Preço: {product.get('price')}")
+        print(f"  Tem desconto: {product.get('has_discount')}")
     
-    finally:
-        # Limpar recursos
-        if 'scraper' in locals():
-            scraper.cleanup()
+    # Testar ProductUnifier diretamente
+    unifier = ProductUnifier()
+    print("\n=== Testando ProductUnifier diretamente ===")
+    for i, product in enumerate(results.get('products', [])):
+        match = unifier.find_best_match(
+            product_name=product.get('name', ''),
+            product_brand=product.get('brand', ''),
+            product_description=product.get('description', ''),
+            search_term=search_term
+        )
+        print(f"\nProduto {i+1}:")
+        print(f"  Nome: {product.get('name')}")
+        print(f"  Marca original: {product.get('brand')}")
+        print(f"  Laboratório padronizado: {match['laboratory'] if match else 'N/A'}")
+        print(f"  Tipo de match: {match['match_type'] if match else 'N/A'}")
+        print(f"  Score: {match['similarity_score'] if match else 'N/A'}")
 
 if __name__ == "__main__":
-    test_sao_joao_scraper() 
+    main() 

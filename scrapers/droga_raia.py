@@ -1,6 +1,7 @@
 import re
 import logging
 from .base_scraper import BaseScraper
+from utils.product_unifier import ProductUnifier
 
 # Configuração básica de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -16,88 +17,53 @@ class DrogaRaiaScraper(BaseScraper):
             pharmacy_name="Droga Raia",
             driver=driver
         )
-    
+        self.product_unifier = ProductUnifier()  # Instância única
+
     def search(self, medicine_description):
         """
         Busca medicamentos no site Droga Raia
-        
-        Args:
-            medicine_description (str): Descrição do medicamento a ser buscado
-            
-        Returns:
-            dict: Resultados da busca com produtos encontrados
         """
         try:
-            # Preparar a query de busca
             url = self.create_search_url(medicine_description)
             self.logger.info(f"Buscando URL: {url}")
-            
-            # Fazer a requisição usando Selenium
             response = self.make_request(url)
-            
-            # Parsear o HTML
             soup = self.parse_html(response['content'])
-            
-            # Extrair produtos
-            products = self._extract_products(soup)
+            products = self._extract_products(soup, medicine_description)
             self.logger.info(f"Produtos encontrados: {len(products)}")
-
-            # Ordenar produtos do menor para o maior preço
             products = sorted(
                 products,
                 key=lambda p: p['price'] if isinstance(p['price'], (int, float)) else float('inf')
             )
-            
             return self.format_response(products, url)
-            
         except Exception as e:
             self.logger.error(f"Erro inesperado: {e}")
             return self.format_response([], "", f'Erro inesperado: {str(e)}')
-        # Removido o finally que limpava o driver, já que agora é compartilhado
-    
-    def _extract_products(self, soup):
+
+    def _extract_products(self, soup, search_term):
         """
         Extrai produtos do HTML parseado
-        
-        Args:
-            soup (BeautifulSoup): HTML parseado
-            
-        Returns:
-            list: Lista de produtos extraídos
         """
-        # Encontrar o container de produtos
         products_container = soup.find('div', {'data-testid': 'container-products'})
-        
         if not products_container:
             self.logger.warning("Container de produtos não encontrado no HTML.")
             self.logger.debug(f"HTML da página (primeiros 1000 chars):\n{str(soup)[:1000]}")
             return []
-        
-        # Extrair produtos
         products = []
         product_articles = products_container.find_all('article', class_=lambda x: x and 'vertical' in x)
         self.logger.info(f"Quantidade de <article> encontrados: {len(product_articles)}")
-        
         for idx, article in enumerate(product_articles, 1):
             try:
-                product = self._extract_product_info(article, idx)
+                product = self._extract_product_info(article, idx, search_term)
                 if product:
                     products.append(product)
             except Exception as e:
                 self.logger.error(f"Erro ao extrair produto: {e}")
                 continue
-        
         return products
-    
-    def _extract_product_info(self, article, position=None):
+
+    def _extract_product_info(self, article, position=None, search_term=None):
         """
         Extrai informações de um produto do HTML
-        
-        Args:
-            article: Elemento HTML do produto
-            
-        Returns:
-            dict: Informações do produto ou None se não conseguir extrair
         """
         try:
             # Nome do produto
@@ -107,38 +73,53 @@ class DrogaRaiaScraper(BaseScraper):
                 name = name_link.get_text(strip=True) if name_link else name_element.get_text(strip=True)
             else:
                 name = "Nome não disponível"
-            
             # Marca/Fabricante
             brand_element = article.find('a', class_=lambda x: x and 'fibMCW' in x)
             brand = brand_element.get_text(strip=True) if brand_element else "Marca não disponível"
-            
             # Descrição/Quantidade
             description_element = article.find('div', class_=lambda x: x and 'jJbyoN' in x)
             description = ""
             if description_element:
                 desc_p = description_element.find('p')
                 description = desc_p.get_text(strip=True) if desc_p else description_element.get_text(strip=True)
-            
             # Preço
             price_info = self._extract_price(article)
-            
             # Link do produto
             product_link = ""
-            if name_link:
-                product_link = self.base_url + name_link.get('href', '')
-            
+            if name_element:
+                name_link = name_element.find('a')
+                if name_link:
+                    product_link = self.base_url + name_link.get('href', '')
             # Imagem do produto
             img_element = article.find('img', {'data-testid': 'product-image'})
             image_url = ""
             if img_element:
                 image_url = img_element.get('src', '')
-            
             # Verificar se há desconto
             discount_info = self._extract_discount_info(article)
-            
+            # --- Lógica de busca condicional ---
+            final_brand = brand
+            if name and search_term:
+                normalized_name = name.lower().strip()
+                normalized_search = search_term.lower().strip()
+                first_word = normalized_name.split()[0] if normalized_name.split() else ""
+                found_lab = self.product_unifier.find_best_match(
+                    product_name=name,
+                    product_brand=brand,
+                    product_description=description,
+                    search_term=search_term
+                )
+                found_lab_name = found_lab['laboratory'] if found_lab and found_lab.get('laboratory') else ""
+                if first_word == normalized_search.split()[0] and not found_lab_name:
+                    # Buscar página específica (exemplo: extrair marca real da página do produto)
+                    # Aqui você pode implementar a lógica de acessar a página do produto se necessário
+                    # Exemplo: final_brand = self._extract_brand_from_product_page(product_link)
+                    pass  # Placeholder para lógica real se necessário
+                else:
+                    final_brand = found_lab_name or brand
             product_data = {
                 'name': name,
-                'brand': brand,
+                'brand': final_brand,
                 'description': description,
                 'price': price_info['current_price'],
                 'original_price': price_info['original_price'],
@@ -148,7 +129,6 @@ class DrogaRaiaScraper(BaseScraper):
                 'position': position
             }
             return product_data
-            
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
             return None
