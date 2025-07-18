@@ -123,55 +123,103 @@ class ProductUnifier:
         normalized_name = self.normalize_text(product_name)
         normalized_brand = self.normalize_text(product_brand)
         normalized_description = self.normalize_text(product_description)
-        found_lab_in_name = None
         stopwords = set([
             'farma', 'generico', 'genérico', 'lab', 'laboratorio', 'laboratório', 'farmaceutica', 'farmacêutica', 'pharma', 'pharmaceutical', 'com', 'ind', 'indústria', 'industria', 'sa', 's/a', 'sa.', 's.a.'
         ])
+        is_generic = 'generico' in normalized_name or 'genérico' in normalized_name
+        first_word_name = normalized_name.split()[0] if normalized_name.split() else ""
+        first_word_search = self.normalize_text(search_term).split()[0] if search_term else ""
+        is_similar = self._is_similar(first_word_name, first_word_search) if first_word_name and first_word_search else False
+        if is_generic or is_similar:
+            logger.info(f"[Unifier] Produto genérico ou similar à busca detectado, match_type: no_brand")
+            found_lab_in_name = None
+            max_match_count = 0
+            max_lab_word_count = 0
+            for laboratory in self.laboratories:
+                normalized_laboratory = self.normalize_text(laboratory)
+                lab_words = [w for w in normalized_laboratory.split() if len(w) >= 3 and w not in stopwords]
+                # Ignorar laboratórios cujo nome ou qualquer palavra relevante seja similar à molécula buscada
+                if self._is_similar(normalized_laboratory, first_word_search) or any(self._is_similar(lw, first_word_search) for lw in lab_words):
+                    continue
+                match_count = sum(1 for lab_word in lab_words if self._word_in_text(lab_word, normalized_name))
+                logger.debug(f"[Unifier] Testando lab '{laboratory}' (normalizado: '{normalized_laboratory}') no produto '{normalized_name}' - match_count: {match_count}")
+                if match_count > 0:
+                    if (match_count > max_match_count) or (match_count == max_match_count and len(lab_words) > max_lab_word_count):
+                        found_lab_in_name = laboratory
+                        max_match_count = match_count
+                        max_lab_word_count = len(lab_words)
+            if found_lab_in_name:
+                return {
+                    'standardized_name': product_name,
+                    'laboratory': self._lab_format(found_lab_in_name),
+                    'original_brand': product_brand,
+                    'similarity_score': 1.0,
+                    'match_type': 'no_brand'
+                }
+            else:
+                return {
+                    'standardized_name': product_name,
+                    'laboratory': "",
+                    'original_brand': product_brand,
+                    'similarity_score': 1.0,
+                    'match_type': 'no_brand'
+                }
+        found_lab_in_name = None
+        max_match_count = 0
+        max_lab_word_count = 0
         if search_term:
             normalized_search = self.normalize_text(search_term)
             search_words = normalized_search.split()
             words = normalized_name.split()
-            # Se a primeira palavra do termo de busca for similar à primeira do nome, busca laboratório em todo o nome
             if search_words and words and self._is_similar(words[0], search_words[0]):
                 for laboratory in self.laboratories:
                     normalized_laboratory = self.normalize_text(laboratory)
-                    lab_words = normalized_laboratory.split()
-                    for lab_word in lab_words:
-                        if len(lab_word) >= 3 and lab_word not in stopwords and self._word_in_text(lab_word, normalized_name):
+                    lab_words = [w for w in normalized_laboratory.split() if len(w) >= 3 and w not in stopwords]
+                    match_count = sum(1 for lab_word in lab_words if self._word_in_text(lab_word, normalized_name))
+                    logger.debug(f"[Unifier] Testando lab '{laboratory}' (normalizado: '{normalized_laboratory}') no produto '{normalized_name}' - match_count: {match_count}")
+                    if match_count > 0:
+                        if (match_count > max_match_count) or (match_count == max_match_count and len(lab_words) > max_lab_word_count):
                             found_lab_in_name = laboratory
-                            break
-                    if found_lab_in_name:
-                        break
+                            max_match_count = match_count
+                            max_lab_word_count = len(lab_words)
         if found_lab_in_name:
+            logger.info(f"[Unifier] Laboratório identificado no nome: {found_lab_in_name} (mas match_type será 'no_brand')")
             return {
                 'standardized_name': product_name,
                 'laboratory': self._lab_format(found_lab_in_name),
+                'original_brand': product_brand,
                 'similarity_score': 1.0,
-                'match_type': 'laboratory_in_name'
+                'match_type': 'no_brand'
             }
         best_match = None
         found_laboratory_in_description = None
+        max_match_count_desc = 0
+        max_lab_word_count_desc = 0
         if normalized_description:
             for laboratory in self.laboratories:
                 normalized_laboratory = self.normalize_text(laboratory)
-                lab_words = normalized_laboratory.split()
-                for lab_word in lab_words:
-                    if len(lab_word) >= 3 and lab_word not in stopwords and self._word_in_text(lab_word, normalized_description):
+                lab_words = [w for w in normalized_laboratory.split() if len(w) >= 3 and w not in stopwords]
+                match_count = sum(1 for lab_word in lab_words if self._word_in_text(lab_word, normalized_description))
+                if match_count > 0:
+                    if (match_count > max_match_count_desc) or (match_count == max_match_count_desc and len(lab_words) > max_lab_word_count_desc):
                         found_laboratory_in_description = laboratory
-                        break
-                if found_laboratory_in_description:
-                    break
+                        max_match_count_desc = match_count
+                        max_lab_word_count_desc = len(lab_words)
         if found_laboratory_in_description:
+            logger.info(f"[Unifier] Laboratório identificado na descrição: {found_laboratory_in_description}")
             best_match = {
                 'standardized_name': product_name,
                 'laboratory': self._lab_format(found_laboratory_in_description),
+                'original_brand': product_brand,
                 'similarity_score': 1.0,
                 'match_type': 'laboratory_in_description'
             }
         else:
+            logger.info(f"[Unifier] Nenhum laboratório identificado, usando marca: {self._first_word_brand(product_name)}")
             best_match = {
                 'standardized_name': product_name,
                 'laboratory': self._first_word_brand(product_name),
+                'original_brand': product_brand,
                 'similarity_score': 1.0,
                 'match_type': 'brand_identified'
             }
@@ -209,6 +257,8 @@ class ProductUnifier:
                     standardized_product['similarity_score'] = match['similarity_score']
                     standardized_product['match_type'] = match.get('match_type', 'unknown')
                     standardized_product['is_standardized'] = True
+                    if 'original_brand' in match:
+                        standardized_product['original_brand'] = match['original_brand']
                 else:
                     # Produto não encontrado na lista de marcas
                     standardized_product['standardized_name'] = product.get('name', '')
@@ -216,6 +266,7 @@ class ProductUnifier:
                     standardized_product['similarity_score'] = 0.0
                     standardized_product['match_type'] = 'not_found'
                     standardized_product['is_standardized'] = False
+                    standardized_product['original_brand'] = product.get('brand', '')
                 
                 standardized_products.append(standardized_product)
                 
@@ -228,6 +279,7 @@ class ProductUnifier:
                 product_copy['similarity_score'] = 0.0
                 product_copy['match_type'] = 'error'
                 product_copy['is_standardized'] = False
+                product_copy['original_brand'] = product.get('brand', '')
                 standardized_products.append(product_copy)
         
         return standardized_products
