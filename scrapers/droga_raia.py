@@ -149,6 +149,67 @@ class DrogaRaiaScraper(BaseScraper):
                 'has_discount': discount_info['has_discount'],
                 'position': position
             }
+            # Fallback: buscar preço na página do produto se não disponível
+            if ((product_data['price'] == 'Preço não disponível' or product_data['original_price'] == 'Preço não disponível') and product_link):
+                try:
+                    response_prod = self.make_request(product_link)
+                    soup_prod = self.parse_html(response_prod['content'])
+                    # Preço atual
+                    price_span = soup_prod.find('span', class_='sc-fd6fe09f-0 jRRyrf price-pdp-content')
+                    if not price_span:
+                        price_span = soup_prod.find('span', string=lambda t: t and 'R$' in t)
+                    if price_span:
+                        price_text = price_span.get_text(strip=True)
+                        price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
+                        if price_match:
+                            product_data['price'] = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                    # Preço original
+                    original_price_span = soup_prod.find('span', class_='sc-14e14dc8-0 kpLpXu')
+                    if not original_price_span:
+                        all_spans = soup_prod.find_all('span', string=lambda t: t and 'R$' in t)
+                        for span in all_spans:
+                            if price_span and span == price_span:
+                                continue
+                            original_price_span = span
+                            break
+                    if original_price_span:
+                        original_price_text = original_price_span.get_text(strip=True)
+                        original_price_match = re.search(r'R\$[\s]*([\d,.]+)', original_price_text)
+                        if original_price_match:
+                            product_data['original_price'] = float(original_price_match.group(1).replace('.', '').replace(',', '.'))
+                    # Desconto
+                    discount_span = soup_prod.find('span', class_='sc-311eb643-0 igSiSz')
+                    if discount_span:
+                        discount_text = discount_span.get_text(strip=True)
+                        discount_match = re.search(r'(\d+)%', discount_text)
+                        if discount_match:
+                            product_data['discount_percentage'] = int(discount_match.group(1))
+                            product_data['has_discount'] = True
+                    # Fallback robusto: todos os <span> com 'R$'
+                    if (product_data['price'] == 'Preço não disponível' or product_data['original_price'] == 'Preço não disponível'):
+                        all_price_spans = soup_prod.find_all('span', string=lambda t: t and 'R$' in t)
+                        prices_found = []
+                        for span in all_price_spans:
+                            price_text = span.get_text(strip=True)
+                            price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
+                            if price_match:
+                                value = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                                prices_found.append(value)
+                        if prices_found:
+                            if len(prices_found) >= 2:
+                                product_data['original_price'] = max(prices_found)
+                                product_data['price'] = min(prices_found)
+                            else:
+                                product_data['price'] = prices_found[0]
+                                product_data['original_price'] = prices_found[0]
+                            self.logger.info(f"[DrogaRaiaScraper] Preços encontrados na página do produto: {prices_found}")
+                        else:
+                            self.logger.warning(f"[DrogaRaiaScraper] Nenhum preço encontrado na página do produto: {product_link}")
+                            price_container = soup_prod.find('div', id='pdp-price-container')
+                            if price_container:
+                                self.logger.warning(f"[DrogaRaiaScraper] HTML do bloco de preço:\n{price_container.prettify()}")
+                except Exception as e:
+                    self.logger.warning(f"[DrogaRaiaScraper] Falha ao buscar preço na página do produto: {e}")
             return product_data
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
