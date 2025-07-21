@@ -123,13 +123,17 @@ class ProductUnifier:
         normalized_name = self.normalize_text(product_name)
         normalized_brand = self.normalize_text(product_brand)
         normalized_description = self.normalize_text(product_description)
+        normalized_search = self.normalize_text(search_term) if search_term else ""
         stopwords = set([
             'farma', 'generico', 'genérico', 'lab', 'laboratorio', 'laboratório', 'farmaceutica', 'farmacêutica', 'pharma', 'pharmaceutical', 'com', 'ind', 'indústria', 'industria', 'sa', 's/a', 'sa.', 's.a.'
         ])
         is_generic = 'generico' in normalized_name or 'genérico' in normalized_name
         first_word_name = normalized_name.split()[0] if normalized_name.split() else ""
-        first_word_search = self.normalize_text(search_term).split()[0] if search_term else ""
+        first_word_search = normalized_search.split()[0] if normalized_search else ""
         is_similar = self._is_similar(first_word_name, first_word_search) if first_word_name and first_word_search else False
+        # Nova lógica: brand_is_search compara primeiras palavras normalizadas
+        first_word_brand = normalized_brand.split()[0] if normalized_brand.split() else ""
+        brand_is_search = self._is_similar(first_word_brand, first_word_search) if first_word_brand and first_word_search else False
         if is_generic or is_similar:
             logger.info(f"[Unifier] Produto genérico ou similar à busca detectado, match_type: no_brand")
             found_lab_in_name = None
@@ -152,7 +156,7 @@ class ProductUnifier:
                 return {
                     'standardized_name': product_name,
                     'laboratory': self._lab_format(found_lab_in_name),
-                    'brand': self._lab_format(found_lab_in_name),
+                    'brand': None if brand_is_search else self._lab_format(found_lab_in_name),
                     'original_brand': product_brand,
                     'similarity_score': 1.0,
                     'match_type': 'no_brand'
@@ -161,7 +165,7 @@ class ProductUnifier:
                 return {
                     'standardized_name': product_name,
                     'laboratory': "",
-                    'brand': "",
+                    'brand': None if brand_is_search else "",
                     'original_brand': product_brand,
                     'similarity_score': 1.0,
                     'match_type': 'no_brand'
@@ -189,6 +193,7 @@ class ProductUnifier:
             return {
                 'standardized_name': product_name,
                 'laboratory': self._lab_format(found_lab_in_name),
+                'brand': None if brand_is_search else self._lab_format(found_lab_in_name),
                 'original_brand': product_brand,
                 'similarity_score': 1.0,
                 'match_type': 'no_brand'
@@ -212,6 +217,7 @@ class ProductUnifier:
             best_match = {
                 'standardized_name': product_name,
                 'laboratory': self._lab_format(found_laboratory_in_description),
+                'brand': None if brand_is_search else self._lab_format(found_laboratory_in_description),
                 'original_brand': product_brand,
                 'similarity_score': 1.0,
                 'match_type': 'laboratory_in_description'
@@ -221,6 +227,7 @@ class ProductUnifier:
             best_match = {
                 'standardized_name': product_name,
                 'laboratory': self._first_word_brand(product_name),
+                'brand': None if brand_is_search else self._first_word_brand(product_name),
                 'original_brand': product_brand,
                 'similarity_score': 1.0,
                 'match_type': 'brand_identified'
@@ -261,6 +268,12 @@ class ProductUnifier:
                     standardized_product['is_standardized'] = True
                     if 'original_brand' in match:
                         standardized_product['original_brand'] = match['original_brand']
+                    if 'brand' in match:
+                        # Se match['brand'] é None, mas o produto original tem brand preenchido, mantenha o original
+                        if match['brand'] is None and product.get('brand'):
+                            standardized_product['brand'] = product.get('brand')
+                        else:
+                            standardized_product['brand'] = match['brand']
                 else:
                     # Produto não encontrado na lista de marcas
                     standardized_product['standardized_name'] = product.get('name', '')

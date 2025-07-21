@@ -222,8 +222,11 @@ def search_medicines():
                     }
                     break
         
-        # Salvar resultados no cache (apenas os dados das farmácias, sem processamento)
-        cache_mgr.save_cache_results(medicine_description, results)
+        # Salvar resultados no cache (apenas se não houver erro)
+        has_error = any('error' in v and v['error'] for v in results.values())
+        has_products = any(v.get('products') for v in results.values())
+        if not has_error and has_products:
+            cache_mgr.save_cache_results(medicine_description, results)
         
         # Processar produtos com ProductUnifier
         processed_results = process_pharmacy_results(results, medicine_description)

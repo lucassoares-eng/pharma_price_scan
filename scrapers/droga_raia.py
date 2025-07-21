@@ -111,15 +111,29 @@ class DrogaRaiaScraper(BaseScraper):
                 )
                 found_lab_name = found_lab['laboratory'] if found_lab and found_lab.get('laboratory') else ""
                 if first_word == normalized_search.split()[0] and not found_lab_name:
-                    # Buscar página específica (exemplo: extrair marca real da página do produto)
-                    # Aqui você pode implementar a lógica de acessar a página do produto se necessário
-                    # Exemplo: final_brand = self._extract_brand_from_product_page(product_link)
-                    pass  # Placeholder para lógica real se necessário
+                    self.logger.info(f"[DrogaRaiaScraper] Entrando no fluxo de extração de fabricante na página do produto: {product_link}")
+                    extracted_brand = self._extract_brand_from_product_page(product_link)
+                    self.logger.info(f"[DrogaRaiaScraper] Fabricante extraído da página do produto: {extracted_brand}")
+                    final_brand = extracted_brand if extracted_brand else None
+                    # Retorne o produto imediatamente, pois não faz sentido extrair outros campos de uma página de produto
+                    product_data = {
+                        'name': name,
+                        'brand': final_brand,
+                        'description': description,
+                        'price': price_info['current_price'],
+                        'original_price': price_info['original_price'],
+                        'discount_percentage': discount_info['percentage'],
+                        'product_url': product_link,
+                        'has_discount': discount_info['has_discount'],
+                        'position': position
+                    }
+                    self.logger.info(f"[DrogaRaiaScraper] Produto retornado após extração de fabricante: {product_data}")
+                    return product_data
                 else:
                     final_brand = found_lab_name or brand
             product_data = {
                 'name': name,
-                'brand': final_brand,
+                'brand': final_brand if final_brand is not None else None,
                 'description': description,
                 'price': price_info['current_price'],
                 'original_price': price_info['original_price'],
@@ -214,3 +228,62 @@ class DrogaRaiaScraper(BaseScraper):
                 'has_discount': False,
                 'percentage': 0
             } 
+
+    def _extract_brand_from_product_page(self, product_url):
+        """
+        Acessa a página do produto e tenta extrair a marca real, priorizando o Fabricante.
+        """
+        try:
+            if not product_url:
+                return None
+            response = self.make_request(product_url)
+            soup = self.parse_html(response['content'])
+            # 1. Procurar pelo <li> cujo <span> seja 'Fabricante' (case insensitive, robusto)
+            li_tags = soup.find_all('li')
+            for li in li_tags:
+                spans = li.find_all('span')
+                if len(spans) >= 2:
+                    label = spans[0].get_text(strip=True).lower()
+                    if 'fabricante' in label:
+                        # O valor pode estar em <span> ou <a> dentro do segundo span
+                        value_span = spans[1]
+                        a_tag = value_span.find('a')
+                        if a_tag and a_tag.get_text(strip=True):
+                            return a_tag.get_text(strip=True)
+                        # Se não houver <a>, pegar texto do <span>
+                        value_text = value_span.get_text(strip=True)
+                        if value_text:
+                            return value_text
+            # 2. Se não achar, procurar pelo <li> cujo <span> seja 'Marca'
+            for li in li_tags:
+                spans = li.find_all('span')
+                if len(spans) >= 2:
+                    label = spans[0].get_text(strip=True).lower()
+                    if 'marca' in label:
+                        value_span = spans[1]
+                        a_tag = value_span.find('a')
+                        if a_tag and a_tag.get_text(strip=True):
+                            return a_tag.get_text(strip=True)
+                        value_text = value_span.get_text(strip=True)
+                        if value_text:
+                            return value_text
+            # 3. Fallbacks antigos
+            dt_tags = soup.find_all('dt')
+            for dt in dt_tags:
+                if 'marca' in dt.get_text(strip=True).lower() or 'fabricante' in dt.get_text(strip=True).lower():
+                    dd = dt.find_next_sibling('dd')
+                    if dd:
+                        return dd.get_text(strip=True)
+            possible_labels = ['marca', 'fabricante']
+            for label in possible_labels:
+                label_elem = soup.find(string=lambda t: t and label in t.lower())
+                if label_elem:
+                    parent = label_elem.parent
+                    if parent and parent.find_next_sibling():
+                        return parent.find_next_sibling().get_text(strip=True)
+            meta_brand = soup.find('meta', {'name': 'brand'})
+            if meta_brand and meta_brand.get('content'):
+                return meta_brand['content']
+        except Exception as e:
+            self.logger.error(f"Erro ao extrair marca da página do produto: {e}")
+        return None 

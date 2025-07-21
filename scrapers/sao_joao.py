@@ -273,52 +273,43 @@ class SaoJoaoScraper(BaseScraper):
     def _extract_brand_from_product_page(self, product_url):
         """
         Extrai a marca correta da página do produto
-        
-        Args:
-            product_url (str): URL da página do produto
-            
-        Returns:
-            str: Nome da marca ou "Marca não disponível" se não conseguir extrair
         """
         if not product_url:
             return "Marca não disponível"
-        
-        try:
-            self.logger.info(f"Acessando página do produto: {product_url}")
-            
-            # Abrir a página do produto
-            self.driver.get(product_url)
-            
-            # Aguardar carregamento da página
-            time.sleep(2)
-            
-            # Tentar aceitar cookies se necessário
+        tried_restart = False
+        while True:
             try:
-                WebDriverWait(self.driver, 3).until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, "//button[contains(translate(., 'ACEITAR', 'aceitar'), 'aceitar') or contains(., 'Aceitar') or contains(., 'OK') or contains(., 'Ok') or contains(., 'ok') or contains(., 'Concordo') or contains(., 'concordo')]")
-                    )
-                ).click()
-                self.logger.info("Cookies aceitos na página do produto")
-            except Exception:
-                pass
-            
-            # Aguardar um pouco mais para garantir carregamento
-            time.sleep(1)
-            
-            # Procurar pela marca na página do produto
-            brand = self._find_brand_in_page()
-            
-            if brand and brand != "Marca não disponível":
-                self.logger.info(f"Marca encontrada: {brand}")
-                return brand
-            else:
-                self.logger.warning("Marca não encontrada na página do produto")
+                self.logger.info(f"Acessando página do produto: {product_url}")
+                self.driver.get(product_url)
+                time.sleep(2)
+                try:
+                    WebDriverWait(self.driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//button[contains(translate(., 'ACEITAR', 'aceitar'), 'aceitar') or contains(., 'Aceitar') or contains(., 'OK') or contains(., 'Ok') or contains(., 'ok') or contains(., 'Concordo') or contains(., 'concordo')]")
+                        )
+                    ).click()
+                    self.logger.info("Cookies aceitos na página do produto")
+                except Exception:
+                    pass
+                time.sleep(1)
+                brand = self._find_brand_in_page()
+                if brand and brand != "Marca não disponível":
+                    self.logger.info(f"Marca encontrada: {brand}")
+                    return brand
+                else:
+                    self.logger.warning("Marca não encontrada na página do produto")
+                    return "Marca não disponível"
+            except Exception as e:
+                error_msg = str(e)
+                self.logger.error(f"Erro ao acessar página do produto: {e}")
+                if (not tried_restart) and ('invalid session id' in error_msg.lower()):
+                    from app import cleanup_global_driver, setup_global_driver, get_global_driver
+                    cleanup_global_driver()
+                    setup_global_driver()
+                    self.driver = get_global_driver()
+                    tried_restart = True
+                    continue
                 return "Marca não disponível"
-                
-        except Exception as e:
-            self.logger.error(f"Erro ao acessar página do produto: {e}")
-            return "Marca não disponível"
     
     def _find_brand_in_page(self):
         """
