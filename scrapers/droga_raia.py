@@ -131,9 +131,16 @@ class DrogaRaiaScraper(BaseScraper):
                     return product_data
                 else:
                     final_brand = found_lab_name or brand
+            # Capitalizar brand, exceto EMS
+            brand_value = final_brand
+            if isinstance(brand_value, str) and brand_value.strip():
+                if brand_value.strip().upper() == 'EMS':
+                    brand_value = 'EMS'
+                else:
+                    brand_value = ' '.join([w.capitalize() for w in brand_value.strip().split()])
             product_data = {
                 'name': name,
-                'brand': final_brand if final_brand is not None else None,
+                'brand': brand_value,
                 'description': description,
                 'price': price_info['current_price'],
                 'original_price': price_info['original_price'],

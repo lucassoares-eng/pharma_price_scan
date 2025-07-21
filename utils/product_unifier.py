@@ -271,9 +271,17 @@ class ProductUnifier:
                     if 'brand' in match:
                         # Se match['brand'] é None, mas o produto original tem brand preenchido, mantenha o original
                         if match['brand'] is None and product.get('brand'):
-                            standardized_product['brand'] = product.get('brand')
+                            brand_value = product.get('brand')
                         else:
-                            standardized_product['brand'] = match['brand']
+                            brand_value = match['brand']
+                        # Capitalizar marca, exceto EMS
+                        if isinstance(brand_value, str) and brand_value.strip():
+                            if brand_value.strip().upper() == 'EMS':
+                                standardized_product['brand'] = 'EMS'
+                            else:
+                                standardized_product['brand'] = ' '.join([w.capitalize() for w in brand_value.strip().split()])
+                        else:
+                            standardized_product['brand'] = brand_value
                 else:
                     # Produto não encontrado na lista de marcas
                     standardized_product['standardized_name'] = product.get('name', '')
@@ -283,6 +291,12 @@ class ProductUnifier:
                     standardized_product['is_standardized'] = False
                     standardized_product['original_brand'] = product.get('brand', '')
                 
+                # Após atribuição, garantir capitalização correta do brand (exceto EMS)
+                if 'brand' in standardized_product and isinstance(standardized_product['brand'], str) and standardized_product['brand'].strip():
+                    if standardized_product['brand'].strip().upper() == 'EMS':
+                        standardized_product['brand'] = 'EMS'
+                    else:
+                        standardized_product['brand'] = ' '.join([w.capitalize() for w in standardized_product['brand'].strip().split()])
                 standardized_products.append(standardized_product)
                 
             except Exception as e:

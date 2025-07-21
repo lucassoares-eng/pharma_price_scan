@@ -187,6 +187,14 @@ class SaoJoaoScraper(BaseScraper):
                 'has_discount': discount_info['has_discount'],
                 'position': position
             }
+            # Capitalizar brand, exceto EMS
+            brand_value = product_data.get('brand', '')
+            if isinstance(brand_value, str) and brand_value.strip():
+                if brand_value.strip().upper() == 'EMS':
+                    brand_value = 'EMS'
+                else:
+                    brand_value = ' '.join([w.capitalize() for w in brand_value.strip().split()])
+            product_data['brand'] = brand_value
             return product_data
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
