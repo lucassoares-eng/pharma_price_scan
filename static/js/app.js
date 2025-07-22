@@ -84,8 +84,8 @@ window.descontoBadgePlugin = {
                 const barWidth = Math.round(baseFontSize * 0.32); // fino
                 const barHeight = Math.round(baseFontSize * 1.1); // altura próxima do texto
                 const barSpacing = Math.round(barWidth * 0.7); // barras próximas
-                // Posição inicial das barras: ainda mais para a esquerda, próximas do início do label da marca
-                let barsX = barStart - 43;
+                // Posição inicial das barras: ajuste responsivo para mobile
+                let barsX = window.innerWidth < 576 ? barStart - 28 : barStart - 43;
                 let barsY = bar.y; // já está centralizado com o texto
                 // Desenhar 5 barras verticais lado a lado
                 for (let b = 0; b < 5; b++) {
@@ -1120,20 +1120,20 @@ function renderPriceChart(products) {
     // Ajustar altura do chart-wrapper via CSS
     const chartWrapper = document.getElementById('priceChart').parentElement;
     if (isMobile) {
-        chartWrapper.style.minHeight = `${Math.max(40 * barCount, 200)}px`; // Altura reduzida para mobile
+        chartWrapper.style.minHeight = `${Math.max(32 * barCount, 120)}px`;
     } else if (isTablet) {
-        chartWrapper.style.minHeight = `${Math.max(40 * barCount, 220)}px`; // Altura aumentada para tablet
+        chartWrapper.style.minHeight = `${Math.max(40 * barCount, 180)}px`;
     } else {
         chartWrapper.style.minHeight = `${Math.max(40 * barCount, 200)}px`;
     }
 
     // Espessura e espaçamento das barras
-    let barThickness = isMobile ? 28 : isTablet ? 28 : 28;
+    let barThickness = isMobile ? 22 : isTablet ? 22 : 22;
     let maxBarThickness = isMobile ? 28 : isTablet ? 28 : 28;
     let barPercentage = isMobile ? 0.40 : 0.40;
     let categoryPercentage = isMobile ? 0.5 : 0.5;
     // Fonte dos rótulos
-    let fontSize = isMobile ? 13 : isTablet ? 13 : 13;
+    let fontSize = isMobile ? 9 : isTablet ? 13 : 13;
 
     if (window.priceChart && typeof window.priceChart.destroy === 'function') window.priceChart.destroy();
     // Gradiente para as barras
@@ -1172,9 +1172,9 @@ function renderPriceChart(products) {
             },
             layout: {
                 padding: {
-                    top: isMobile ? 5 : 20,
-                    bottom: isMobile ? 5 : 20,
-                    left: isMobile ? 25 : 35,
+                    top: isMobile ? 2 : 20,
+                    bottom: isMobile ? 2 : 20,
+                    left: isMobile ? 6 : 10,
                     right: 0
                 }
             },
@@ -1221,11 +1221,11 @@ function renderPriceChart(products) {
                     grid: { color: 'rgba(102,126,234,0.07)', drawBorder: false },
                     ticks: {
                         font: {
-                            size: fontSize,
+                            size: isMobile ? 9 : fontSize,
                             weight: 'bold'
                         },
                         color: '#2d2e4a',
-                        padding: isMobile ? 35 : 45
+                        padding: isMobile ? 25 : 45
                     }
                 }
             },

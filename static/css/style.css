@@ -139,16 +139,31 @@ body {
 
 @media (max-width: 575px) {
     .chart-container {
-        padding: 1rem 0.5rem 0.7rem 0.5rem;
-        border-radius: 15px;
-    }
-    .star-legend {
-        padding: 0.4rem 0.5rem;
-        font-size: 0.85em;
+        padding: 0.08rem 0.02rem 0.08rem 0.02rem;
+        border-radius: 2px;
+        border-width: 0.5px;
     }
     .chart-container h5, .chart-container h6 {
-        font-size: 1rem;
-        margin-bottom: 0.7rem;
+        font-size: 0.68rem;
+        margin-bottom: 0.32rem;
+    }
+    .star-legend {
+        padding: 0.1rem 0.1rem;
+        font-size: 0.65em;
+    }
+    .sort-buttons-container {
+        gap: 0.08rem;
+    }
+    /* Diminui fonte dos labels do eixo Y (marcas), preços, números e título do eixo x */
+    #priceChart {
+        font-size: 0.55rem !important;
+    }
+    .chartjs-xaxis .tick, .chartjs-xaxis .label, .chartjs-xaxis-title, .chartjs-xaxis-title text {
+        font-size: 0.55rem !important;
+    }
+    #medicineInput {
+        font-size: 0.92rem;
+        padding: 0.5rem 0.7rem;
     }
 }
 
@@ -528,129 +543,55 @@ body {
 }
 
 /* Estilos para botões de classificação com fundo branco */
-.btn-light.sort-btn {
-    border: 1px solid #007bff;
-    color: #007bff;
-    background-color: #fff;
-    transition: all 0.3s ease;
-    font-size: 0.75rem;
-    padding: 0.25rem 0.375rem;
-    min-width: 60px;
-    white-space: nowrap;
-}
-
-@media (min-width: 576px) {
-    .btn-light.sort-btn {
-        font-size: 0.8rem;
-        padding: 0.375rem 0.5rem;
-        min-width: 70px;
-    }
-}
-
-@media (min-width: 768px) {
-    .btn-light.sort-btn {
-        font-size: 0.875rem;
-        padding: 0.5rem 0.75rem;
-        min-width: 80px;
-    }
-}
-
-@media (min-width: 992px) {
-    .btn-light.sort-btn {
-        font-size: 0.9rem;
-        padding: 0.5rem 0.875rem;
-        min-width: 90px;
-    }
-}
-
-.btn-light.sort-btn:hover {
-    background-color: #007bff;
-    border-color: #007bff;
-    color: #fff;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
-}
-
-.btn-light.sort-btn.active {
-    background-color: #007bff;
-    border-color: #007bff;
-    color: #fff;
+.btn-light.sort-btn, .btn-outline-primary.sort-btn {
+    border-radius: 22px !important;
+    background: linear-gradient(135deg, #f8fafc 0%, #e9eafc 100%);
+    color: #1e3a8a;
+    border: 1.5px solid #a084e8;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.08);
     font-weight: 600;
-    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+    transition: all 0.18s cubic-bezier(.4,0,.2,1);
+    padding: 0.32rem 0.7rem;
+    font-size: 0.92rem;
+    margin: 0 0.12rem 0.22rem 0.12rem;
+    min-width: 64px;
+    min-height: 30px;
+    outline: none;
 }
-
-.btn-light.sort-btn.active:hover {
-    background-color: #0056b3;
-    border-color: #0056b3;
+.btn-light.sort-btn:active, .btn-outline-primary.sort-btn:active {
+    background: linear-gradient(135deg, #e9eafc 0%, #f8fafc 100%);
+    box-shadow: 0 1px 4px rgba(102, 126, 234, 0.13);
+    color: #764ba2;
+    border-color: #764ba2;
+}
+.btn-light.sort-btn.active, .btn-outline-primary.sort-btn.active {
+    background: linear-gradient(135deg, #a084e8 0%, #667eea 100%);
     color: #fff;
-    transform: translateY(-1px);
-    box-shadow: 0 3px 6px rgba(0, 86, 179, 0.4);
-}
-
-/* Estilos para botões de classificação com fundo transparente */
-.btn-outline-primary.sort-btn {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.375rem;
-    min-width: 60px;
-    white-space: nowrap;
-}
-
-@media (min-width: 576px) {
-    .btn-outline-primary.sort-btn {
-        font-size: 0.8rem;
-        padding: 0.375rem 0.5rem;
-        min-width: 70px;
-    }
-}
-
-@media (min-width: 768px) {
-    .btn-outline-primary.sort-btn {
-        font-size: 0.875rem;
-        padding: 0.5rem 0.75rem;
-        min-width: 80px;
-    }
-}
-
-@media (min-width: 992px) {
-    .btn-outline-primary.sort-btn {
-        font-size: 0.9rem;
-        padding: 0.5rem 0.875rem;
-        min-width: 90px;
-    }
-}
-
-.btn-outline-primary.sort-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
-}
-
-.btn-outline-primary.sort-btn.active {
-    font-weight: 600;
-    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
-}
-
-.btn-outline-primary.sort-btn.active:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 3px 6px rgba(0, 123, 255, 0.4);
+    border-color: #764ba2;
+    box-shadow: 0 3px 12px rgba(118, 75, 162, 0.13);
 }
 
 /* Container dos botões de classificação */
 .sort-buttons-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25rem;
+    gap: 0.4rem;
     align-items: center;
+    justify-content: flex-start;
 }
 
-@media (min-width: 576px) {
-    .sort-buttons-container {
-        gap: 0.375rem;
+@media (max-width: 575px) {
+    .btn-light.sort-btn, .btn-outline-primary.sort-btn {
+        font-size: 0.85rem;
+        padding: 0.22rem 0.5rem;
+        min-width: 48px;
+        min-height: 26px;
+        margin-bottom: 0.12rem;
     }
-}
-
-@media (min-width: 768px) {
     .sort-buttons-container {
-        gap: 0.5rem;
+        gap: 0.12rem;
+        flex-direction: row;
+        justify-content: flex-start;
     }
 }
 
