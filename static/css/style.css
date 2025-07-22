@@ -88,17 +88,56 @@ body {
 }
 
 .chart-container {
-    background: white;
-    border-radius: 15px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #f8fafc 0%, #e9eafc 100%);
+    border-radius: 22px;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.10), 0 1.5px 6px rgba(118, 75, 162, 0.08);
+    padding: 1.5rem 1.5rem 1.2rem 1.5rem;
+    margin-bottom: 2rem;
+    border: 1.5px solid #e3e8f7;
 }
 
-@media (min-width: 768px) {
+.chart-container h5, .chart-container h6 {
+    color: #2d2e4a;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.01em;
+    margin-bottom: 1.1rem;
+}
+
+.star-legend {
+    background: rgba(245, 247, 255, 0.85);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.07);
+    padding: 0.5rem 1rem;
+    display: inline-block;
+    margin-top: 0.5rem;
+}
+
+.star-legend .legend-item {
+    margin-right: 1.2rem;
+    font-size: 0.92em;
+    color: #495057;
+}
+
+.star-legend .legend-star {
+    font-size: 1.1em;
+    font-weight: bold;
+    vertical-align: middle;
+    margin-right: 0.2em;
+}
+
+@media (max-width: 575px) {
     .chart-container {
-        padding: 1.5rem;
-        margin-bottom: 2rem;
+        padding: 1rem 0.5rem 0.7rem 0.5rem;
+        border-radius: 15px;
+    }
+    .star-legend {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.85em;
+    }
+    .chart-container h5, .chart-container h6 {
+        font-size: 1rem;
+        margin-bottom: 0.7rem;
     }
 }
 
@@ -475,20 +514,6 @@ body {
 
 #comparisonSection h5, #comparisonSection strong, #comparisonSection small {
     color: #212529 !important;
-}
-
-.chart-container h6 {
-    color: #495057;
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    font-size: 0.9rem;
-}
-
-@media (min-width: 768px) {
-    .chart-container h6 {
-        margin-bottom: 1rem;
-        font-size: 1rem;
-    }
 }
 
 /* Estilos para botões de classificação com fundo branco */

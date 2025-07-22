@@ -1163,23 +1163,28 @@ function renderPriceChart(products) {
     // Ajustar altura do chart-wrapper via CSS
     const chartWrapper = document.getElementById('priceChart').parentElement;
     if (isMobile) {
-        chartWrapper.style.minHeight = `${Math.max(60 * barCount, 200)}px`; // Altura reduzida para mobile
+        chartWrapper.style.minHeight = `${Math.max(40 * barCount, 200)}px`; // Altura reduzida para mobile
     } else if (isTablet) {
-        chartWrapper.style.minHeight = `${Math.max(50 * barCount, 220)}px`; // Altura aumentada para tablet
+        chartWrapper.style.minHeight = `${Math.max(40 * barCount, 220)}px`; // Altura aumentada para tablet
     } else {
-        chartWrapper.style.minHeight = `${Math.max(32 * barCount, 200)}px`;
+        chartWrapper.style.minHeight = `${Math.max(40 * barCount, 200)}px`;
     }
 
     // Espessura e espaçamento das barras
-    let barThickness = isMobile ? 12 : isTablet ? 18 : 32;
-    let maxBarThickness = isMobile ? 16 : isTablet ? 22 : 40;
-    let barPercentage = isMobile ? 0.35 : 0.65;
-    let categoryPercentage = isMobile ? 0.8 : 0.7;
+    let barThickness = isMobile ? 28 : isTablet ? 28 : 28;
+    let maxBarThickness = isMobile ? 28 : isTablet ? 28 : 28;
+    let barPercentage = isMobile ? 0.40 : 0.40;
+    let categoryPercentage = isMobile ? 0.5 : 0.5;
     // Fonte dos rótulos
-    let fontSize = isMobile ? 12 : isTablet ? 13 : 14;
+    let fontSize = isMobile ? 13 : isTablet ? 13 : 13;
 
     if (window.priceChart && typeof window.priceChart.destroy === 'function') window.priceChart.destroy();
-    window.priceChart = new Chart(document.getElementById('priceChart').getContext('2d'), {
+    // Gradiente para as barras
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 600, 0);
+    gradient.addColorStop(0, '#667eea');
+    gradient.addColorStop(1, '#764ba2');
+    window.priceChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: sortedBrands.map(b => b.brand),
@@ -1188,13 +1193,11 @@ function renderPriceChart(products) {
                 data: sortedBrands.map(b => b.avgPrice),
                 backgroundColor: sortedBrands.map(b =>
                     selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
-                    selectedProduct ? '#a8b4e6' : '#667eea'
+                    selectedProduct ? '#a8b4e6' : gradient
                 ),
-                borderColor: sortedBrands.map(b =>
-                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
-                    selectedProduct ? '#a8b4e6' : '#667eea'
-                ),
-                borderWidth: isMobile ? 0 : isTablet ? 0.8 : 1,
+                borderColor: 'rgba(102,126,234,0.18)',
+                borderWidth: 1.5,
+                borderRadius: 12,
                 discounts: sortedBrands.map(b => b.maxDiscount > 0 ? b.maxDiscount : null),
                 minDiscounts: sortedBrands.map(b => b.hasMultipleDiscounts ? b.minDiscount : null),
                 maxDiscounts: sortedBrands.map(b => b.hasMultipleDiscounts ? b.maxDiscount : null),
@@ -1210,7 +1213,8 @@ function renderPriceChart(products) {
             responsive: true,
             maintainAspectRatio: false,
             animation: {
-                duration: 0 // Desabilita todas as animações
+                duration: 700,
+                easing: 'easeOutQuart'
             },
             layout: {
                 padding: {
@@ -1224,13 +1228,19 @@ function renderPriceChart(products) {
                 legend: { display: false },
                 datalabels: { display: false },
                 tooltip: {
+                    backgroundColor: 'rgba(60, 60, 80, 0.92)',
+                    titleFont: { family: 'Segoe UI', weight: 'bold', size: 15 },
+                    bodyFont: { family: 'Segoe UI', weight: 'normal', size: 13 },
+                    borderColor: '#667eea',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
                     callbacks: {
                         label: function(context) {
                             const discount = context.dataset.discounts[context.dataIndex];
                             const minDiscount = context.dataset.minDiscounts ? context.dataset.minDiscounts[context.dataIndex] : null;
                             const maxDiscount = context.dataset.maxDiscounts ? context.dataset.maxDiscounts[context.dataIndex] : null;
                             let label = `Preço médio: R$ ${context.parsed.x.toFixed(2).replace('.', ',')}`;
-                            
                             if (minDiscount !== null && maxDiscount !== null && minDiscount !== maxDiscount) {
                                 label += ` | Desconto: até -${maxDiscount}%`;
                             } else if (discount) {
@@ -1244,17 +1254,23 @@ function renderPriceChart(products) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Preço (R$)' }
+                    title: { display: true, text: 'Preço (R$)', color: '#2d2e4a', font: { weight: 'bold', size: 15 } },
+                    grid: { display: false },
+                    ticks: {
+                        color: '#2d2e4a',
+                        font: { size: fontSize, weight: 'bold' }
+                    }
                 },
                 y: {
                     offset: true,
                     grace: isMobile ? '5%' : '5%',
+                    grid: { color: 'rgba(102,126,234,0.07)', drawBorder: false },
                     ticks: {
                         font: {
                             size: fontSize,
                             weight: 'bold'
                         },
-                        color: '#333',
+                        color: '#2d2e4a',
                         padding: isMobile ? 35 : 45
                     }
                 }
