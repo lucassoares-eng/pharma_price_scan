@@ -1208,7 +1208,7 @@ function renderPriceChart(products) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Preço (R$)', color: '#2d2e4a', font: { weight: 'bold', size: 15 } },
+                    title: { display: true, text: 'Preço (R$)', color: '#2d2e4a', font: { weight: 'bold', size: isMobile ? 9 : 15 } },
                     grid: { display: false },
                     ticks: {
                         color: '#2d2e4a',
