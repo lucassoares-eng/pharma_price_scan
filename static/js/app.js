@@ -741,33 +741,45 @@ async function updatePositionComparison() {
     });
 
     // Renderizar interface com spinner primeiro
-    document.getElementById('positionInfo').innerHTML = `
-        <div class="row g-3 mb-4">
-            <div class="col-12 col-md-6">
-                <strong>${selectedProduct.brand}</strong><br>
-                <span class="position-indicator ${positionClass}">${positionText}</span><br>
-                <small>${selectedBrandAvg.prices.length} produtos encontrados em ${pharmacyCount} farmácia${pharmacyCount > 1 ? 's' : ''}</small>
+    if (!selectedProduct) {
+        document.getElementById('positionInfo').innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-hand-pointer fa-2x mb-2"></i><br>
+                Selecione uma marca para ver a análise comparativa.
             </div>
-            <div class="col-12 col-md-6">
-                <strong>Preço médio: R$ ${selectedBrandAvg.avgPrice.toFixed(2).replace('.', ',')}</strong><br>
-                <small><i class="fas fa-arrow-down text-success me-1"></i>Menor: R$ ${minPrice.toFixed(2).replace('.', ',')} | <i class="fas fa-arrow-up text-danger me-1"></i>Maior: R$ ${maxPrice.toFixed(2).replace('.', ',')}</small><br>
-                <small>${priceDiffText} em relação à média geral</small>
-            </div>
-        </div>
-        <div class="ia-analysis-section">
-            <h6 class="mb-3"><i class="fas fa-robot me-2"></i>Análise Inteligente (Gemini IA)</h6>
-            <div class="ia-loading text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando análise...</span>
+        `;
+    } else {
+        document.getElementById('positionInfo').innerHTML = `
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6">
+                    <strong>${selectedProduct.brand}</strong><br>
+                    <span class="position-indicator ${positionClass}">${positionText}</span><br>
+                    <small>${selectedBrandAvg.prices.length} produtos encontrados em ${pharmacyCount} farmácia${pharmacyCount > 1 ? 's' : ''}</small>
                 </div>
-                <p class="mt-2 text-muted">Gerando análise inteligente...</p>
+                <div class="col-12 col-md-6">
+                    <strong>Preço médio: R$ ${selectedBrandAvg.avgPrice.toFixed(2).replace('.', ',')}</strong><br>
+                    <small><i class="fas fa-arrow-down text-success me-1"></i>Menor: R$ ${minPrice.toFixed(2).replace('.', ',')} | <i class="fas fa-arrow-up text-danger me-1"></i>Maior: R$ ${maxPrice.toFixed(2).replace('.', ',')}</small><br>
+                    <small>${priceDiffText} em relação à média geral</small>
+                </div>
             </div>
-        </div>
-        <h6 class="mb-3"><i class="fas fa-store me-2"></i>Detalhes por Farmácia</h6>
-        <div class="row g-2">
-            ${pharmacyCardsHtml}
-        </div>
-    `;
+            <div class="ia-analysis-section">
+                <h6 class="mb-3"><i class="fas fa-robot me-2"></i>Análise Inteligente (Gemini IA)</h6>
+                <div class="ia-loading text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando análise...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Gerando análise inteligente...</p>
+                </div>
+            </div>
+            <h6 class="mb-3"><i class="fas fa-store me-2"></i>Detalhes por Farmácia</h6>
+            <div class="row g-2">
+                ${pharmacyCardsHtml}
+            </div>
+        `;
+    }
+    
+    document.getElementById('comparisonSection').style.display = 'block';
+    document.querySelector('#comparisonSection h5').innerHTML = '<i class="fas fa-chart-line me-2"></i>Análise Comparativa';
 
     // Gerar análise com IA
     let iaAnalysis = '';
