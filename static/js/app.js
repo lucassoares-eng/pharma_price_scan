@@ -641,9 +641,21 @@ async function updatePositionComparison(forceNewAnalysis = false) {
         brand: product.brand
     }));
 
+    // Calcular a moda das posições para a marca (mesmo cálculo do gráfico)
+    const allBrandProducts = allProducts.filter(p => p.brand === selectedProduct.brand);
+    const positions = allBrandProducts.map(p => p.position).filter(pos => pos !== null && pos !== undefined);
+    let moda = null;
+    if (positions.length > 0) {
+        const freq = {};
+        positions.forEach(pos => { freq[pos] = (freq[pos] || 0) + 1; });
+        const maxFreq = Math.max(...Object.values(freq));
+        const modaCandidates = Object.keys(freq).filter(pos => freq[pos] === maxFreq).map(Number);
+        moda = Math.floor(Math.min(...modaCandidates)); // arredonda para baixo se empate
+    }
+    
     // Gerar cards para cada farmácia
     let pharmacyCardsHtml = '';
-    brandProducts.forEach(product => {
+    allBrandProducts.forEach(product => {
         // Encontrar produtos da mesma farmácia para comparação
         const pharmacyProducts = allProducts.filter(p => p.pharmacy === product.pharmacy);
         
@@ -678,6 +690,21 @@ async function updatePositionComparison(forceNewAnalysis = false) {
                                cheapestProduct.price < product.price &&
                                bestPositionedProduct.position < product.position;
         
+        // Definir cor do badge baseada na posição específica daquele produto naquela farmácia
+        let positionBadgeClass = 'bg-secondary'; // padrão cinza
+        const productPosition = product.position;
+        if (productPosition === 1) {
+            positionBadgeClass = 'bg-warning text-dark'; // dourado
+        } else if (productPosition === 2) {
+            positionBadgeClass = 'bg-info text-white'; // azul claro
+        } else if (productPosition === 3) {
+            positionBadgeClass = 'bg-danger text-white'; // bronze/vermelho
+        } else if (productPosition === 4 || productPosition === 5) {
+            positionBadgeClass = 'bg-dark text-white'; // cinza escuro
+        } else if (productPosition > 5) {
+            positionBadgeClass = 'bg-secondary text-white'; // cinza claro
+        }
+        
         const priceDisplay = typeof product.price === 'number' 
             ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
             : product.price;
@@ -708,7 +735,7 @@ async function updatePositionComparison(forceNewAnalysis = false) {
                             </div>
                             <div class="col-6">
                                 <small class="text-muted">Posição:</small><br>
-                                <span class="badge bg-secondary">${product.position || 'N/A'}</span>
+                                <span class="badge ${positionBadgeClass}">${product.position || 'N/A'}</span>
                             </div>
                         </div>
                         <div class="row g-1 mb-1">

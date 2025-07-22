@@ -1229,4 +1229,28 @@ body {
     flex-direction: unset !important;
     flex-wrap: unset !important;
   }
+  
+  /* Diminuir tamanho da fonte dos nomes dos produtos e preços em mobile */
+  .product-card h6 {
+    font-size: 0.8rem !important;
+    line-height: 1.1 !important;
+    margin-bottom: 0.25rem !important;
+  }
+  
+  .product-card .price {
+    font-size: 0.75rem !important;
+    font-weight: bold !important;
+  }
+  
+  .product-card .original-price {
+    font-size: 0.65rem !important;
+  }
+  
+  .product-card .discount-badge {
+    font-size: 0.6rem !important;
+  }
+  
+  .product-card .brand-badge {
+    font-size: 0.65rem !important;
+  }
 } 
