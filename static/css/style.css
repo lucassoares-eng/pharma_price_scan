@@ -1143,3 +1143,51 @@ body {
         box-shadow: none !important;
     }
 } 
+
+@media (max-width: 575px) {
+  .ia-analysis-section .row.g-2 {
+    display: block !important;
+    flex-direction: unset !important;
+    flex-wrap: unset !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    gap: 0 !important;
+  }
+  .ia-analysis-section .row.g-2 > .col-6,
+  .ia-analysis-section .row.g-2 > .col-md-4,
+  .ia-analysis-section .row.g-2 > .col-lg-3 {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+    float: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 1.1rem !important;
+  }
+}
+
+/* CSS ultra-específico para forçar cards de farmácia em largura total em mobile */
+@media (max-width: 575px) {
+  .ia-analysis-section .row.g-2 {
+    display: block !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    gap: 0 !important;
+  }
+  .ia-analysis-section .row.g-2 > [class*='col-'] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    float: none !important;
+    flex: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 1.1rem !important;
+  }
+} 

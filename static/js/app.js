@@ -3,6 +3,7 @@ let selectedProduct = null;
 let priceChart = null;
 let currentSort = 'relevancia';
 let currentPharmacyFilter = ''; // Variável global para preservar o filtro
+let iaAnalysisCache = {}; // Cache para análises de IA
 
 window.descontoBadgePlugin = {
     afterDatasetsDraw: function(chart) {
@@ -270,7 +271,7 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
                     
                     // Manter análise comparativa visível
                     if (wasComparisonVisible) {
-                        updatePositionComparison();
+                        updatePositionComparison(false); // Usa cache quando ordenação é alterada
                         document.getElementById('comparisonSection').style.display = 'block';
                     }
                     
@@ -292,6 +293,9 @@ document.getElementById('searchForm').addEventListener('submit', async function(
         alert('Por favor, digite a descrição do medicamento.');
         return;
     }
+    
+    // Limpar cache de análises de IA para nova busca
+    iaAnalysisCache = {};
     
     // Mostrar seção de resultados e loading
     document.getElementById('resultsSection').style.display = 'block';
@@ -504,7 +508,7 @@ function showBrandSelector() {
                 // Encontrar o primeiro produto da marca selecionada
                 selectedProduct = allProducts.find(p => p.brand === selectedBrand);
                 renderPriceChart(allProducts);
-                updatePositionComparison();
+                updatePositionComparison(true); // Força nova análise quando marca é selecionada
                 highlightAllProductsOfBrand();
             } else {
                 selectedProduct = null;
@@ -568,7 +572,7 @@ function updatePriceChart() {
     }
 }
 
-async function updatePositionComparison() {
+async function updatePositionComparison(forceNewAnalysis = false) {
     if (!selectedProduct) return;
     
     // Calcular estatísticas por marca
@@ -781,43 +785,55 @@ async function updatePositionComparison() {
     document.getElementById('comparisonSection').style.display = 'block';
     document.querySelector('#comparisonSection h5').innerHTML = '<i class="fas fa-chart-line me-2"></i>Análise Comparativa';
 
-    // Gerar análise com IA
+    // Verificar se já temos análise em cache para esta marca
+    const brandKey = selectedProduct.brand;
     let iaAnalysis = '';
-    try {
-        const requestData = {
-            brand: selectedProduct.brand,
-            position: position,
-            total_brands: totalBrands,
-            avg_price: selectedBrandAvg.avgPrice,
-            min_price: minPrice,
-            max_price: maxPrice,
-            pharmacy_count: pharmacyCount,
-            price_diff_text: priceDiffText,
-            pharmacies_analyzed: pharmaciesAnalyzed,
-            products_data: allProductsData
-        };
-        
-        console.log('Dados enviados para IA:', requestData);
-        console.log('Total de produtos enviados:', allProductsData.length);
-        
-        const response = await fetch('/api/pharma/ia/brand-analysis', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestData)
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            iaAnalysis = `<div class="ia-summary alert alert-info mb-3"><i class="fas fa-robot me-1"></i>${data.analysis}</div>`;
-        } else {
-            console.error('Erro na análise de IA:', data.error);
-            iaAnalysis = `<div class="ia-summary alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Não foi possível gerar a análise inteligente. Erro: ${data.error}</div>`;
+    
+    if (!forceNewAnalysis && iaAnalysisCache[brandKey]) {
+        // Usar análise em cache
+        iaAnalysis = iaAnalysisCache[brandKey];
+        console.log('Usando análise em cache para:', brandKey);
+    } else {
+        // Gerar nova análise com IA
+        try {
+            const requestData = {
+                brand: selectedProduct.brand,
+                position: position,
+                total_brands: totalBrands,
+                avg_price: selectedBrandAvg.avgPrice,
+                min_price: minPrice,
+                max_price: maxPrice,
+                pharmacy_count: pharmacyCount,
+                price_diff_text: priceDiffText,
+                pharmacies_analyzed: pharmaciesAnalyzed,
+                products_data: allProductsData
+            };
+            
+            console.log('Dados enviados para IA:', requestData);
+            console.log('Total de produtos enviados:', allProductsData.length);
+            
+            const response = await fetch('/api/pharma/ia/brand-analysis', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                iaAnalysis = `<div class="ia-summary alert alert-info mb-3"><i class="fas fa-robot me-1"></i>${data.analysis}</div>`;
+                // Salvar no cache
+                iaAnalysisCache[brandKey] = iaAnalysis;
+                console.log('Análise salva em cache para:', brandKey);
+            } else {
+                console.error('Erro na análise de IA:', data.error);
+                iaAnalysis = `<div class="ia-summary alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Não foi possível gerar a análise inteligente. Erro: ${data.error}</div>`;
+            }
+        } catch (error) {
+            console.error('Erro ao chamar API de IA:', error);
+            iaAnalysis = `<div class="ia-summary alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Erro de conexão com o serviço de IA. Tente novamente.</div>`;
         }
-    } catch (error) {
-        console.error('Erro ao chamar API de IA:', error);
-        iaAnalysis = `<div class="ia-summary alert alert-warning mb-3"><i class="fas fa-exclamation-triangle me-1"></i>Erro de conexão com o serviço de IA. Tente novamente.</div>`;
     }
 
     // Atualizar a seção de análise com o resultado
