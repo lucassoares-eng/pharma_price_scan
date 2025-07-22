@@ -52,17 +52,29 @@ window.descontoBadgePlugin = {
             
             // Desenhar barras verticais de ranking (sinal de celular, agora finas, próximas, mesmo tamanho e alinhadas ao texto)
             if (position) {
-                // Cores das barras para cada posição
+                // Calcular a moda das posições para a marca (arredondando para cima em caso de empate)
+                const brandProducts = allProducts.filter(p => p.brand === chart.data.labels[i]);
+                const positions = brandProducts.map(p => p.position).filter(pos => pos !== null && pos !== undefined);
+                let moda = null;
+                if (positions.length > 0) {
+                    const freq = {};
+                    positions.forEach(pos => { freq[pos] = (freq[pos] || 0) + 1; });
+                    const maxFreq = Math.max(...Object.values(freq));
+                    // Pega todas as posições com frequência máxima
+                    const modaCandidates = Object.keys(freq).filter(pos => freq[pos] === maxFreq).map(Number);
+                    moda = Math.floor(Math.min(...modaCandidates)); // arredonda para baixo se empate
+                }
+                // Cores das barras para cada moda
                 let barColors = [];
-                if (position === 1) {
+                if (moda === 1) {
                     barColors = ['#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700']; // Dourado
-                } else if (position === 2) {
-                    barColors = ['#C0C0C0', '#C0C0C0', '#C0C0C0', '#C0C0C0', '#e0e0e0']; // Prata
-                } else if (position === 3) {
+                } else if (moda === 2) {
+                    barColors = ['#5bc0f7', '#5bc0f7', '#5bc0f7', '#5bc0f7', '#e0e0e0']; // Azul claro metálico
+                } else if (moda === 3) {
                     barColors = ['#CD7F32', '#CD7F32', '#CD7F32', '#e0e0e0', '#e0e0e0']; // Bronze
-                } else if (position === 4) {
+                } else if (moda === 4) {
                     barColors = ['#555555', '#555555', '#e0e0e0', '#e0e0e0', '#e0e0e0']; // Cinza escuro
-                } else if (position === 5) {
+                } else if (moda === 5) {
                     barColors = ['#555555', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0']; // Cinza escuro só na primeira
                 } else {
                     barColors = ['#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0']; // Todas vazias
@@ -912,23 +924,23 @@ function renderProductsAndChart(products) {
                     <div class="chart-wrapper">
                         <canvas id="priceChart"></canvas>
                     </div>
-                    <!-- Legenda das estrelas -->
+                    <!-- Legenda das barras de ranking -->
                     <div class="star-legend mt-3 text-center">
                         <small class="text-muted">
                             <span class="legend-item me-3">
-                                <span class="legend-star" style="color: #FFD700;">★</span> 1ª posição
+                                <span class="legend-bar gold"></span> 1ª posição
                             </span>
                             <span class="legend-item me-3">
-                                <span class="legend-star" style="color: #C0C0C0;">★</span> 2ª posição
+                                <span class="legend-bar silver"></span> 2ª posição
                             </span>
                             <span class="legend-item me-3">
-                                <span class="legend-star" style="color: #CD7F32;">★</span> 3ª posição
+                                <span class="legend-bar bronze"></span> 3ª posição
                             </span>
                             <span class="legend-item me-3">
-                                <span class="legend-star" style="color: #555555;">★</span> 4ª+ posição
+                                <span class="legend-bar dark"></span> 4ª/5ª posição
                             </span>
                             <span class="legend-item">
-                                <i class="fas fa-info-circle me-1"></i>Primeira estrela: menor posição | Segunda estrela: maior posição
+                                <span class="legend-bar gray"></span> acima de 5
                             </span>
                         </small>
                     </div>
