@@ -1190,4 +1190,43 @@ body {
     margin-right: 0 !important;
     margin-bottom: 1.1rem !important;
   }
+}
+
+/* CSS adicional para garantir que os cards de farmácia ocupem largura total em mobile */
+@media (max-width: 575px) {
+  .ia-analysis-section .row.g-2 > .col-12 {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  .pharmacy-detail-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Forçar layout de bloco para todos os cards de farmácia */
+  .ia-analysis-section .row.g-2 > div {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+    float: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Garantir que o container dos cards não use flexbox */
+  .ia-analysis-section .row.g-2 {
+    display: block !important;
+    flex-direction: unset !important;
+    flex-wrap: unset !important;
+  }
 } 

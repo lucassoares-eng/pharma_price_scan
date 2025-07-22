@@ -686,7 +686,7 @@ async function updatePositionComparison(forceNewAnalysis = false) {
             : product.original_price;
         
         pharmacyCardsHtml += `
-            <div class="col-6 col-md-4 col-lg-3 mb-2">
+            <div class="col-12 col-md-4 col-lg-3 mb-2">
                 <div class="card pharmacy-detail-card ${hasBetterOption ? 'border-warning' : ''}">
                     <div class="card-header d-flex align-items-center">
                         <div class="pharmacy-logo me-1">
