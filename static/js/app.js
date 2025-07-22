@@ -763,7 +763,7 @@ async function updatePositionComparison() {
                 </div>
             </div>
             <div class="ia-analysis-section">
-                <h6 class="mb-3"><i class="fas fa-robot me-2"></i>Análise Inteligente (Gemini IA)</h6>
+                <h6 class="mb-3"><i class="fas fa-magic me-2"></i>Análise Inteligente</h6>
                 <div class="ia-loading text-center py-4">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Carregando análise...</span>
@@ -824,8 +824,8 @@ async function updatePositionComparison() {
     const iaSection = document.querySelector('.ia-analysis-section');
     if (iaSection) {
         iaSection.innerHTML = `
-            <h6 class="mb-3"><i class="fas fa-robot me-2"></i>Análise Inteligente (Gemini IA)</h6>
-            ${iaAnalysis}
+            <h6 class="mb-3"><i class="fas fa-magic me-2"></i>Análise Inteligente</h6>
+            <div class="ia-summary ia-summary-modern mb-3">${iaAnalysis.replace(/<i class=\"fas fa-robot[^>]*><\/i>/g, '').replace(/<i class=\"fas fa-brain[^>]*><\/i>/g, '').replace(/<i class=\"fas fa-sparkles[^>]*><\/i>/g, '')}</div>
         `;
     }
     
