@@ -1148,10 +1148,7 @@ function renderPriceChart(products) {
             datasets: [{
                 label: 'Preço Médio (R$)',
                 data: sortedBrands.map(b => b.avgPrice),
-                backgroundColor: sortedBrands.map(b =>
-                    selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
-                    selectedProduct ? '#a8b4e6' : gradient
-                ),
+                backgroundColor: sortedBrands.map(_ => gradient),
                 borderColor: 'rgba(102,126,234,0.18)',
                 borderWidth: 1.5,
                 borderRadius: 12,
@@ -1240,7 +1237,50 @@ function renderPriceChart(products) {
                 }
             }
         },
-        plugins: [window.descontoBadgePlugin]
+        plugins: [
+            // Plugin para destacar a barra selecionada
+            {
+                afterDatasetsDraw: function(chart) {
+                    if (!selectedProduct) return;
+                    const dataset = chart.data.datasets[0];
+                    const meta = chart.getDatasetMeta(0);
+                    chart.data.labels.forEach((brand, i) => {
+                        if (brand === selectedProduct.brand) {
+                            const bar = meta.data[i];
+                            if (!bar) return;
+                            const ctx = chart.ctx;
+                            ctx.save();
+                            ctx.shadowColor = 'rgba(30,58,138,0.18)';
+                            ctx.shadowBlur = 10;
+                            ctx.lineWidth = 3;
+                            ctx.strokeStyle = '#1e3a8a';
+                            ctx.beginPath();
+                            const left = Math.min(bar.x, bar.base) - 4;
+                            const right = Math.max(bar.x, bar.base) + 4;
+                            const top = bar.y - bar.height / 2 - 4;
+                            const bottom = bar.y + bar.height / 2 + 4;
+                            const width = right - left;
+                            const height = bottom - top;
+                            const radius = Math.min(12, bar.height / 2 + 2);
+                            ctx.moveTo(left + radius, top);
+                            ctx.lineTo(left + width - radius, top);
+                            ctx.quadraticCurveTo(left + width, top, left + width, top + radius);
+                            ctx.lineTo(left + width, top + height - radius);
+                            ctx.quadraticCurveTo(left + width, top + height, left + width - radius, bottom);
+                            ctx.lineTo(left + radius, bottom);
+                            ctx.quadraticCurveTo(left, bottom, left, bottom - radius);
+                            ctx.lineTo(left, top + radius);
+                            ctx.quadraticCurveTo(left, top, left + radius, top);
+                            ctx.closePath();
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    });
+                }
+            },
+            // Plugin do badge de desconto (deve ser o último para ficar na frente)
+            window.descontoBadgePlugin
+        ]
     });
     // Adicionar hover para as estrelas
     document.getElementById('priceChart').onmousemove = function(evt) {
