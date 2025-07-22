@@ -28,8 +28,10 @@ window.descontoBadgePlugin = {
             // --- Ajuste responsivo da fonte do preço ---
             let priceFont = 'bold 16px Segoe UI, Arial';
             if (window.innerWidth < 576) {
-                priceFont = 'bold 12px Segoe UI, Arial';
+                priceFont = 'bold 10px Segoe UI, Arial';
             } else if (window.innerWidth < 992) {
+                priceFont = 'bold 13px Segoe UI, Arial';
+            } else {
                 priceFont = 'bold 14px Segoe UI, Arial';
             }
             ctx.font = priceFont;
@@ -48,107 +50,50 @@ window.descontoBadgePlugin = {
             ctx.fillText(priceLabel, textX, textY);
             const priceWidth = ctx.measureText(priceLabel).width;
             
-            // Desenhar estrelas com posições (menor e maior)
+            // Desenhar barras verticais de ranking (sinal de celular, agora finas, próximas, mesmo tamanho e alinhadas ao texto)
             if (position) {
-                const starSize = window.innerWidth < 576 ? 6 : window.innerWidth < 992 ? 10 : 14;
-                const starSpacing = starSize * 1.4; // Espaçamento ainda menor entre as estrelas
-                
-                // Calcular menor e maior posição para esta marca
-                const brandProducts = allProducts.filter(p => p.brand === chart.data.labels[i]);
-                const positions = brandProducts.map(p => p.position).filter(pos => pos !== null && pos !== undefined);
-                
-                if (positions.length > 0) {
-                    const minPosition = Math.min(...positions);
-                    const maxPosition = Math.max(...positions);
-                    
-                    // Desenhar primeira estrela (maior posição) próxima dos nomes
-                    let starX = maxPosition !== minPosition ? barStart - 35 : barStart - 25; // Centralizada quando uma estrela
-                    let starY = maxPosition !== minPosition ? bar.y + 8 : bar.y; // No meio quando uma estrela, mais abaixo quando duas
-                    
-                    // Definir cor da primeira estrela baseada na maior posição
-                    let starColor1, textColor1;
-                    if (maxPosition === 1) {
-                        starColor1 = '#FFD700'; // Dourado
-                        textColor1 = '#fff';
-                    } else if (maxPosition === 2) {
-                        starColor1 = '#C0C0C0'; // Prata
-                        textColor1 = '#fff';
-                    } else if (maxPosition === 3) {
-                        starColor1 = '#CD7F32'; // Bronze
-                        textColor1 = '#fff';
-                    } else {
-                        starColor1 = '#555555'; // Cinza escuro
-                        textColor1 = '#fff';
-                    }
-                    
-                    // Desenhar primeira estrela com pontas menores
-                    ctx.fillStyle = starColor1;
+                // Cores das barras para cada posição
+                let barColors = [];
+                if (position === 1) {
+                    barColors = ['#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700']; // Dourado
+                } else if (position === 2) {
+                    barColors = ['#C0C0C0', '#C0C0C0', '#C0C0C0', '#C0C0C0', '#e0e0e0']; // Prata
+                } else if (position === 3) {
+                    barColors = ['#CD7F32', '#CD7F32', '#CD7F32', '#e0e0e0', '#e0e0e0']; // Bronze
+                } else if (position === 4) {
+                    barColors = ['#555555', '#555555', '#e0e0e0', '#e0e0e0', '#e0e0e0']; // Cinza escuro
+                } else if (position === 5) {
+                    barColors = ['#555555', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0']; // Cinza escuro só na primeira
+                } else {
+                    barColors = ['#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0']; // Todas vazias
+                }
+                // Tamanho e espaçamento das barras (finas, próximas e proporcionais ao texto)
+                const baseFontSize = window.innerWidth < 576 ? 10 : window.innerWidth < 992 ? 13 : 14;
+                const barWidth = Math.round(baseFontSize * 0.32); // fino
+                const barHeight = Math.round(baseFontSize * 1.1); // altura próxima do texto
+                const barSpacing = Math.round(barWidth * 0.7); // barras próximas
+                // Posição inicial das barras: ainda mais para a esquerda, próximas do início do label da marca
+                let barsX = barStart - 43;
+                let barsY = bar.y; // já está centralizado com o texto
+                // Desenhar 5 barras verticais lado a lado
+                for (let b = 0; b < 5; b++) {
                     ctx.beginPath();
-                    for (let j = 0; j < 10; j++) {
-                        const angle = (j * 2 * Math.PI) / 10 - Math.PI / 2;
-                        const radius = j % 2 === 0 ? starSize : starSize * 0.5; // Pontas menores
-                        const x = starX + radius * Math.cos(angle);
-                        const y = starY + radius * Math.sin(angle);
-                        if (j === 0) {
-                            ctx.moveTo(x, y);
-                        } else {
-                            ctx.lineTo(x, y);
-                        }
-                    }
+                    // Retângulo arredondado
+                    const x = barsX + b * (barWidth + barSpacing);
+                    const y = barsY - barHeight / 2;
+                    const radius = barWidth / 2;
+                    ctx.moveTo(x + radius, y);
+                    ctx.lineTo(x + barWidth - radius, y);
+                    ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+                    ctx.lineTo(x + barWidth, y + barHeight - radius);
+                    ctx.quadraticCurveTo(x + barWidth, y + barHeight, x + barWidth - radius, y + barHeight);
+                    ctx.lineTo(x + radius, y + barHeight);
+                    ctx.quadraticCurveTo(x, y + barHeight, x, y + barHeight - radius);
+                    ctx.lineTo(x, y + radius);
+                    ctx.quadraticCurveTo(x, y, x + radius, y);
                     ctx.closePath();
+                    ctx.fillStyle = barColors[b];
                     ctx.fill();
-                    
-                    // Adicionar número da maior posição
-                    ctx.fillStyle = textColor1;
-                    ctx.font = `bold ${starSize * 0.8}px Segoe UI, Arial`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(maxPosition.toString(), starX, starY);
-                    
-                    // Desenhar segunda estrela (menor posição) se for diferente da primeira
-                    if (maxPosition !== minPosition) {
-                        starX = barStart - 35 + (starSpacing * 0.8); // Ajustado para sobreposição moderada
-                        
-                        // Definir cor da segunda estrela baseada na menor posição
-                        let starColor2, textColor2;
-                        if (minPosition === 1) {
-                            starColor2 = '#FFD700'; // Dourado
-                            textColor2 = '#fff';
-                        } else if (minPosition === 2) {
-                            starColor2 = '#C0C0C0'; // Prata
-                            textColor2 = '#fff';
-                        } else if (minPosition === 3) {
-                            starColor2 = '#CD7F32'; // Bronze
-                            textColor2 = '#fff';
-                        } else {
-                            starColor2 = '#555555'; // Cinza escuro
-                            textColor2 = '#fff';
-                        }
-                        
-                        // Desenhar segunda estrela com pontas menores (acima e à direita)
-                        ctx.fillStyle = starColor2;
-                        ctx.beginPath();
-                        for (let j = 0; j < 10; j++) {
-                            const angle = (j * 2 * Math.PI) / 10 - Math.PI / 2;
-                            const radius = j % 2 === 0 ? starSize : starSize * 0.5; // Pontas menores
-                            const x = starX + radius * Math.cos(angle);
-                            const y = (starY - 12) + radius * Math.sin(angle); // Posicionada mais acima da primeira
-                            if (j === 0) {
-                                ctx.moveTo(x, y);
-                            } else {
-                                ctx.lineTo(x, y);
-                            }
-                        }
-                        ctx.closePath();
-                        ctx.fill();
-                        
-                        // Adicionar número da menor posição
-                        ctx.fillStyle = textColor2;
-                        ctx.font = `bold ${starSize * 0.8}px Segoe UI, Arial`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(minPosition.toString(), starX, starY - 12); // Posicionada mais acima da primeira
-                    }
                 }
             }
             
