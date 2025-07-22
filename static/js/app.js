@@ -4,6 +4,8 @@ let priceChart = null;
 let currentSort = 'relevancia';
 let currentPharmacyFilter = ''; // Variável global para preservar o filtro
 let iaAnalysisCache = {}; // Cache para análises de IA
+let currentPage = 1; // Página atual
+let productsPerPage = 10; // Produtos por página
 
 window.descontoBadgePlugin = {
     afterDatasetsDraw: function(chart) {
@@ -240,6 +242,66 @@ function renderSortButtons(targetId, useWhiteBackground = false) {
     `;
 }
 
+function renderPagination(totalProducts, currentPage, productsPerPage) {
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+    if (totalPages <= 1) return '';
+    
+    let paginationHtml = '<div class="pagination-container mt-3 d-flex justify-content-center align-items-center">';
+    paginationHtml += '<nav aria-label="Navegação de páginas">';
+    paginationHtml += '<ul class="pagination pagination-sm mb-0">';
+    
+    // Botão Anterior
+    if (currentPage > 1) {
+        paginationHtml += `<li class="page-item"><button class="page-link" onclick="changePage(${currentPage - 1})">Anterior</button></li>`;
+    } else {
+        paginationHtml += `<li class="page-item disabled"><span class="page-link">Anterior</span></li>`;
+    }
+    
+    // Números das páginas
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    if (startPage > 1) {
+        paginationHtml += `<li class="page-item"><button class="page-link" onclick="changePage(1)">1</button></li>`;
+        if (startPage > 2) {
+            paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        if (i === currentPage) {
+            paginationHtml += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+        } else {
+            paginationHtml += `<li class="page-item"><button class="page-link" onclick="changePage(${i})">${i}</button></li>`;
+        }
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        paginationHtml += `<li class="page-item"><button class="page-link" onclick="changePage(${totalPages})">${totalPages}</button></li>`;
+    }
+    
+    // Botão Próximo
+    if (currentPage < totalPages) {
+        paginationHtml += `<li class="page-item"><button class="page-link" onclick="changePage(${currentPage + 1})">Próximo</button></li>`;
+    } else {
+        paginationHtml += `<li class="page-item disabled"><span class="page-link">Próximo</span></li>`;
+    }
+    
+    paginationHtml += '</ul>';
+    paginationHtml += '</nav>';
+    paginationHtml += '</div>';
+    
+    return paginationHtml;
+}
+
+function changePage(page) {
+    currentPage = page;
+    renderProductsAndChart(allProducts);
+}
+
 function attachSortButtonListeners(products, renderListFn, renderChartFn) {
     document.querySelectorAll('.sort-btn').forEach(btn => {
         btn.onclick = function() {
@@ -254,9 +316,96 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
             const pharmacyFilter = document.getElementById('pharmacyFilter');
             currentPharmacyFilter = pharmacyFilter ? pharmacyFilter.value : '';
             
+            // Não resetar página ao ordenar
+            const originalCurrentPage = currentPage;
+            
             renderListFn(products);
             if (renderChartFn) {
                 renderChartFn(products);
+            }
+            
+            // Restaurar página atual se estava em uma página > 1
+            if (originalCurrentPage > 1) {
+                currentPage = originalCurrentPage;
+                // Re-aplicar a paginação correta
+                const filteredProducts = currentPharmacyFilter && currentPharmacyFilter.trim() !== '' 
+                    ? products.filter(product => product.pharmacy === currentPharmacyFilter)
+                    : products;
+                const sortedProducts = getSortedProducts(filteredProducts, currentSort);
+                const totalProducts = sortedProducts.length;
+                const totalPages = Math.ceil(totalProducts / productsPerPage);
+                
+                // Ajustar se a página atual é maior que o total de páginas
+                if (currentPage > totalPages && totalPages > 0) {
+                    currentPage = totalPages;
+                }
+                
+                // Re-renderizar apenas a lista com a página correta
+                const startIndex = (currentPage - 1) * productsPerPage;
+                const endIndex = startIndex + productsPerPage;
+                const currentPageProducts = sortedProducts.slice(startIndex, endIndex);
+                
+                // Renderizar produtos da página atual
+                let productsHtml = '';
+                currentPageProducts.forEach(product => {
+                    const priceDisplay = typeof product.price === 'number' 
+                        ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
+                        : product.price;
+                    const originalPriceDisplay = typeof product.original_price === 'number' 
+                        ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
+                        : product.original_price;
+                    productsHtml += `
+                        <div class="product-card" data-product-id="${product.name}">
+                            <div class="row align-items-center g-2">
+                                <div class="col-2 col-md-1">
+                                    <div class="pharmacy-logo">
+                                        ${product.pharmacy === 'Droga Raia' ? 
+                                            '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
+                                            product.pharmacy === 'São João' ?
+                                            '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                            `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
+                                        }
+                                    </div>
+                                </div>
+                                <div class="col-7 col-md-6">
+                                    <h6 class="fw-bold mb-1 text-truncate">${product.name}</h6>
+                                    <span class="brand-badge">${product.brand}</span>
+                                    ${product.description ? `<p class="description-text mb-1 d-none d-md-block">${product.description}</p>` : ''}
+                                </div>
+                                <div class="col-3 col-md-5 text-end">
+                                    <div class="price">${priceDisplay}</div>
+                                    ${product.has_discount ? 
+                                        `<div class="original-price">${originalPriceDisplay}</div>
+                                         <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
+                                    }
+                                    ${product.product_url ? 
+                                        `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2 d-none d-md-inline-block">
+                                            <i class="fas fa-external-link-alt me-1"></i><span class="d-none d-lg-inline">Ver produto</span>
+                                        </a>` : ''
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                // Atualizar apenas a lista de produtos e paginação
+                const productsListContainer = document.getElementById('productsList');
+                if (productsListContainer) {
+                    productsListContainer.innerHTML = productsHtml;
+                }
+                
+                // Atualizar paginação
+                const paginationContainer = document.querySelector('.pagination-container');
+                if (paginationContainer) {
+                    paginationContainer.outerHTML = renderPagination(totalProducts, currentPage, productsPerPage);
+                }
+                
+                // Atualizar contador de produtos
+                const badge = document.querySelector('.pharmacy-header .badge');
+                if (badge) {
+                    badge.innerHTML = `${totalProducts} produtos`;
+                }
             }
             
             // Restaurar estado da marca selecionada se existia
@@ -296,6 +445,8 @@ document.getElementById('searchForm').addEventListener('submit', async function(
     
     // Limpar cache de análises de IA para nova busca
     iaAnalysisCache = {};
+    // Resetar página atual
+    currentPage = 1;
     
     // Mostrar seção de resultados e loading
     document.getElementById('resultsSection').style.display = 'block';
@@ -486,9 +637,15 @@ function displayResults(data) {
 function showBrandSelector() {
     console.log('Iniciando showBrandSelector');
     
+    // Verificar se já foi inicializado
+    const brandSelect = document.getElementById('brandSelect');
+    if (brandSelect.getAttribute('data-initialized') === 'true') {
+        console.log('BrandSelector já foi inicializado, pulando...');
+        return;
+    }
+    
     // Obter marcas únicas
     const uniqueBrands = [...new Set(allProducts.map(p => p.brand))];
-    const brandSelect = document.getElementById('brandSelect');
     
     // Limpar opções existentes
     brandSelect.innerHTML = '<option value="">Selecione uma marca...</option>';
@@ -501,7 +658,7 @@ function showBrandSelector() {
         brandSelect.appendChild(option);
     });
     
-    // Adicionar event listener
+    // Adicionar event listener (só uma vez)
     brandSelect.addEventListener('change', function() {
         const selectedBrand = this.value;
                     if (selectedBrand) {
@@ -520,6 +677,9 @@ function showBrandSelector() {
                 });
             }
     });
+    
+    // Marcar como inicializado
+    brandSelect.setAttribute('data-initialized', 'true');
     
     document.getElementById('brandSelector').style.display = 'block';
 }
@@ -908,12 +1068,35 @@ function displayError(message) {
     resultsDiv.style.display = 'block';
 } 
 
-function renderProductsAndChart(products) {
+function renderProductsAndChart(products, preservePage = false) {
     const resultsDiv = document.getElementById('results');
-    // Renderizar header da lista com botões de ordenação
+    
+    // Aplicar filtro de farmácia se necessário
+    let filteredProducts = products;
+    if (currentPharmacyFilter && currentPharmacyFilter.trim() !== '') {
+        filteredProducts = products.filter(product => product.pharmacy === currentPharmacyFilter);
+    }
+    
+    // Ordenar produtos
+    const sortedProducts = getSortedProducts(filteredProducts, currentSort);
+    
+    // Calcular paginação
+    const totalProducts = sortedProducts.length;
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+    
+    // Ajustar página atual se necessário
+    if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+    }
+    
+    // Obter produtos da página atual
+    const startIndex = (currentPage - 1) * productsPerPage;
+    const endIndex = startIndex + productsPerPage;
+    const currentPageProducts = sortedProducts.slice(startIndex, endIndex);
+    
+    // Renderizar produtos da página atual
     let productsHtml = '';
-    const sortedProducts = getSortedProducts(products, currentSort);
-    sortedProducts.forEach(product => {
+    currentPageProducts.forEach(product => {
         const priceDisplay = typeof product.price === 'number' 
             ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
             : product.price;
@@ -981,23 +1164,24 @@ function renderProductsAndChart(products) {
                     </div>
                     <!-- Legenda das barras de ranking -->
                     <div class="star-legend mt-3 text-center">
-                        <small class="text-muted">
-                            <span class="legend-item me-3">
-                                <span class="legend-bar gold"></span> 1ª posição
-                            </span>
-                            <span class="legend-item me-3">
-                                <span class="legend-bar silver"></span> 2ª posição
-                            </span>
-                            <span class="legend-item me-3">
-                                <span class="legend-bar bronze"></span> 3ª posição
-                            </span>
-                            <span class="legend-item me-3">
-                                <span class="legend-bar dark"></span> 4ª/5ª posição
-                            </span>
-                            <span class="legend-item">
-                                <span class="legend-bar gray"></span> acima de 5
-                            </span>
-                        </small>
+                        <div class="legend-title mb-2">
+                            <small class="text-muted"><i class="fas fa-chart-bar me-1"></i>Ranking de Posicionamento</small>
+                        </div>
+                        <span class="legend-item">
+                            <span class="legend-bar gold"></span> 5 barras = 1ª posição
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-bar silver"></span> 4 barras = 2ª posição
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-bar bronze"></span> 3 barras = 3ª posição
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-bar dark"></span> 2 barras = 4ª posição
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-bar gray"></span> 0-1 barra = 5ª+ posição
+                        </span>
                     </div>
                 </div>
             </div>
@@ -1009,7 +1193,10 @@ function renderProductsAndChart(products) {
         <div class="pharmacy-card">
             <div class="pharmacy-header d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between">
                 <div class="d-flex align-items-center mb-2 mb-md-0">
-                    <i class="fas fa-list me-2"></i>Lista de Produtos <span class="badge bg-light text-dark ms-2">${products.length} produtos</span>
+                    <i class="fas fa-list me-2"></i>Lista de Produtos 
+                    <span class="badge bg-light text-dark ms-2">
+                        ${totalProducts} produtos
+                    </span>
                     <button type="button" class="btn btn-success btn-sm ms-2 ms-md-3" onclick="downloadExcel()">
                         <i class="fas fa-download me-1"></i><span class="d-none d-sm-inline">Exportar Excel</span>
                     </button>
@@ -1030,6 +1217,7 @@ function renderProductsAndChart(products) {
                 <div id="productsList">
                     ${productsHtml}
                 </div>
+                ${renderPagination(totalProducts, currentPage, productsPerPage)}
             </div>
         </div>
     `;
@@ -1066,7 +1254,7 @@ function setupPharmacyFilter(products) {
     });
     
     // Restaurar valor da variável global se ainda for válido
-    if (currentPharmacyFilter && uniquePharmacies.includes(currentPharmacyFilter)) {
+    if (currentPharmacyFilter && currentPharmacyFilter.trim() !== '' && uniquePharmacies.includes(currentPharmacyFilter)) {
         pharmacyFilter.value = currentPharmacyFilter;
         filterProductsByPharmacy(currentPharmacyFilter, products);
     }
@@ -1076,7 +1264,6 @@ function setupPharmacyFilter(products) {
     if (!existingListeners) {
         pharmacyFilter.addEventListener('change', function() {
             const selectedPharmacy = this.value;
-            currentPharmacyFilter = selectedPharmacy; // Atualizar variável global
             filterProductsByPharmacy(selectedPharmacy, products);
         });
         pharmacyFilter.setAttribute('data-has-listener', 'true');
@@ -1084,39 +1271,101 @@ function setupPharmacyFilter(products) {
 }
 
 function filterProductsByPharmacy(selectedPharmacy, allProducts) {
-    const productsList = document.getElementById('productsList');
-    const productCards = productsList.querySelectorAll('.product-card');
+    // Atualizar filtro global
+    currentPharmacyFilter = selectedPharmacy;
     
-    productCards.forEach(card => {
-        const pharmacyLogo = card.querySelector('.pharmacy-logo');
-        let pharmacyName = '';
-        
-        // Determinar a farmácia baseada no logo/imagem
-        if (pharmacyLogo.querySelector('img[src*="raia.png"]')) {
-            pharmacyName = 'Droga Raia';
-        } else if (pharmacyLogo.querySelector('img[src*="sao_joao.png"]')) {
-            pharmacyName = 'São João';
-        } else {
-            // Para outras farmácias, tentar extrair do ícone
-            const icon = pharmacyLogo.querySelector('.logo-icon');
-            if (icon) {
-                pharmacyName = icon.getAttribute('title') || icon.getAttribute('aria-label');
-            }
-        }
-        
-        // Mostrar/ocultar baseado no filtro
-        if (!selectedPharmacy || pharmacyName === selectedPharmacy) {
-            card.style.display = 'block';
-        } else {
-            card.style.display = 'none';
-        }
+    // Resetar página para 1 quando filtro é alterado
+    currentPage = 1;
+    
+    // Se não há filtro aplicado (Todas as farmácias), re-renderizar tudo
+    if (!selectedPharmacy || selectedPharmacy.trim() === '') {
+        renderProductsAndChart(allProducts);
+        return;
+    }
+    
+    // Re-renderizar apenas a lista de produtos sem re-inicializar componentes
+    const resultsDiv = document.getElementById('results');
+    
+    // Aplicar filtro de farmácia
+    const filteredProducts = allProducts.filter(product => product.pharmacy === selectedPharmacy);
+    
+    // Ordenar produtos
+    const sortedProducts = getSortedProducts(filteredProducts, currentSort);
+    
+    // Calcular paginação
+    const totalProducts = sortedProducts.length;
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+    
+    // Ajustar página atual se necessário
+    if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+    }
+    
+    // Obter produtos da página atual
+    const startIndex = (currentPage - 1) * productsPerPage;
+    const endIndex = startIndex + productsPerPage;
+    const currentPageProducts = sortedProducts.slice(startIndex, endIndex);
+    
+    // Renderizar produtos da página atual
+    let productsHtml = '';
+    currentPageProducts.forEach(product => {
+        const priceDisplay = typeof product.price === 'number' 
+            ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
+            : product.price;
+        const originalPriceDisplay = typeof product.original_price === 'number' 
+            ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
+            : product.original_price;
+        productsHtml += `
+            <div class="product-card" data-product-id="${product.name}">
+                <div class="row align-items-center g-2">
+                    <div class="col-2 col-md-1">
+                        <div class="pharmacy-logo">
+                            ${product.pharmacy === 'Droga Raia' ? 
+                                '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
+                                product.pharmacy === 'São João' ?
+                                '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
+                            }
+                        </div>
+                    </div>
+                    <div class="col-7 col-md-6">
+                        <h6 class="fw-bold mb-1 text-truncate">${product.name}</h6>
+                        <span class="brand-badge">${product.brand}</span>
+                        ${product.description ? `<p class="description-text mb-1 d-none d-md-block">${product.description}</p>` : ''}
+                    </div>
+                    <div class="col-3 col-md-5 text-end">
+                        <div class="price">${priceDisplay}</div>
+                        ${product.has_discount ? 
+                            `<div class="original-price">${originalPriceDisplay}</div>
+                             <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
+                        }
+                        ${product.product_url ? 
+                            `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2 d-none d-md-inline-block">
+                                <i class="fas fa-external-link-alt me-1"></i><span class="d-none d-lg-inline">Ver produto</span>
+                            </a>` : ''
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
     });
     
+    // Atualizar apenas a lista de produtos e paginação
+    const productsListContainer = document.getElementById('productsList');
+    if (productsListContainer) {
+        productsListContainer.innerHTML = productsHtml;
+    }
+    
+    // Atualizar paginação
+    const paginationContainer = document.querySelector('.pagination-container');
+    if (paginationContainer) {
+        paginationContainer.outerHTML = renderPagination(totalProducts, currentPage, productsPerPage);
+    }
+    
     // Atualizar contador de produtos
-    const visibleProducts = productsList.querySelectorAll('.product-card[style*="display: block"], .product-card:not([style*="display: none"])');
     const badge = document.querySelector('.pharmacy-header .badge');
     if (badge) {
-        badge.textContent = `${visibleProducts.length} produtos`;
+        badge.innerHTML = `${totalProducts} produtos`;
     }
 }
 
