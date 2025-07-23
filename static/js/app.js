@@ -104,20 +104,20 @@ window.descontoBadgePlugin = {
                 if (moda === 1) {
                     barColors = ['#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700'];
                 } else if (moda === 2) {
-                    barColors = ['#5bc0f7', '#5bc0f7', '#5bc0f7', '#5bc0f7', '#e0e0e0'];
+                    barColors = ['#FFD700', '#FFD700', '#FFD700', '#FFD700', '#e0e0e0'];
                 } else if (moda === 3) {
-                    barColors = ['#CD7F32', '#CD7F32', '#CD7F32', '#e0e0e0', '#e0e0e0'];
+                    barColors = ['#FFD700', '#FFD700', '#FFD700', '#e0e0e0', '#e0e0e0'];
                 } else if (moda === 4) {
-                    barColors = ['#555555', '#555555', '#e0e0e0', '#e0e0e0', '#e0e0e0'];
+                    barColors = ['#FFD700', '#FFD700', '#e0e0e0', '#e0e0e0', '#e0e0e0'];
                 } else if (moda === 5) {
-                    barColors = ['#555555', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0'];
+                    barColors = ['#FFD700', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0'];
                 } else {
                     barColors = ['#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0', '#e0e0e0'];
                 }
                 const baseFontSize = window.innerWidth < 576 ? 10 : window.innerWidth < 992 ? 13 : 14;
-                const barWidth = Math.round(baseFontSize * 0.32);
+                const barWidth = Math.round(baseFontSize * 0.36);
                 const barHeight = Math.round(baseFontSize * 1.1);
-                const barSpacing = Math.round(barWidth * 0.7);
+                const barSpacing = Math.round(barWidth * 0.3);
                 let barsX = window.innerWidth < 576 ? barStart - 28 : barStart - 43;
                 let barsY = bar.y;
                 for (let b = 0; b < 5; b++) {
