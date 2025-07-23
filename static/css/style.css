@@ -1364,3 +1364,17 @@ body {
     border-color: #dee2e6;
   }
 } 
+
+@media (max-width: 575.98px) {
+  #pharmacyFilter, #brandFilter {
+    font-size: 13px;
+  }
+  label[for="pharmacyFilter"], label[for="brandFilter"] {
+    font-size: 12px;
+  }
+  .pagination,
+  .pagination .page-link,
+  .pagination .page-item {
+    font-size: 12px;
+  }
+} 
