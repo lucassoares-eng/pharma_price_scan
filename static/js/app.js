@@ -47,7 +47,8 @@ window.descontoBadgePlugin = {
             }
             ctx.font = priceFont;
             ctx.textAlign = 'right';
-            let textX = bar.x - 6; // 6px de margem à esquerda do final da barra
+            let minX = barStart + 32; // 32px após o início da barra
+            let textX = Math.max(bar.x - 6, minX);
             let textY = bar.y;
             if (i === 0 && window.innerWidth >= 576) {
                 textY += 4; // ajuste intermediário para desktop/tablet
@@ -71,8 +72,15 @@ window.descontoBadgePlugin = {
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#222';
-                // Alinhar ao lado externo direito da barra de maior preço
-                ctx.fillText(maxLabel, metaMax.data[i].x + 6, metaMax.data[i].y);
+                // Calcular largura dos textos
+                let minLabelWidth = ctx.measureText(priceLabel).width;
+                let maxLabelWidth = ctx.measureText(maxLabel).width;
+                let minLabelEnd = Math.max(bar.x - 6, barStart + 32); // posição final do preço mínimo
+                let maxLabelStart = metaMax.data[i].x + 6; // posição inicial do preço máximo
+                // Garantir que o preço máximo nunca fique à esquerda de barStart + 32
+                let maxMinX = barStart + 36;
+                let maxLabelX = Math.max(metaMax.data[i].x + 6, maxMinX);
+                ctx.fillText(maxLabel, maxLabelX, metaMax.data[i].y);
             }
             const priceWidth = ctx.measureText(priceLabel).width;
             // Barras verticais de ranking
