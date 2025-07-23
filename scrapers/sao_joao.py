@@ -271,16 +271,20 @@ class SaoJoaoScraper(BaseScraper):
                         # Garantir que brand nunca seja string vazia
                         if not p['brand'] or not str(p['brand']).strip():
                             p['brand'] = "Marca não disponível"
-        # Filtrar produtos com '+' no nome que não correspondem ao termo de busca
+        # Filtrar produtos com '+' no nome que não correspondem ao termo de busca (com log e normalização)
+        import unicodedata
+        def normalize(text):
+            return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII').lower()
         def is_valid_plus_product(product, search_term):
-            name = product.get('name', '').lower()
-            search = search_term.lower()
+            name = normalize(product.get('name', ''))
+            search = normalize(search_term)
             if '+' in name:
                 after_plus = name.split('+', 1)[1]
                 import re
                 words = re.findall(r'\b\w+\b', after_plus)
                 for word in words:
                     if word not in search:
+                        logger.info(f"[SaoJoaoScraper] Produto eliminado pelo filtro '+': '{product.get('name', '')}' (palavra '{word}' não está na busca '{search_term}')")
                         return False
             return True
         products = [p for p in products if is_valid_plus_product(p, search_term)]
