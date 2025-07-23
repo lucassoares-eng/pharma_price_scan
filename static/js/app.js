@@ -58,7 +58,7 @@ window.descontoBadgePlugin = {
             let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
             // Se o texto está colado no minX, significa que a barra é pequena
             if (textX === minX) {
-                ctx.fillStyle = '#39FF14'; // verde claro fluorescente
+                ctx.fillStyle = '#5bc0f7'; // azul claro metalizado
             } else {
                 ctx.fillStyle = isSelected ? '#222' : '#fff';
             }
@@ -1541,10 +1541,14 @@ function renderPriceChart(products) {
                             const brand = context.chart.data.labels[context.dataIndex];
                             const min = sortedBrands[context.dataIndex].minPrice;
                             const max = sortedBrands[context.dataIndex].maxPrice;
+                            // Encontrar farmácia do menor preço
+                            const brandProducts = allProducts.filter(p => p.brand === brand && typeof p.price === 'number');
+                            const minProduct = brandProducts.find(p => p.price === min);
+                            const maxProduct = brandProducts.find(p => p.price === max);
                             if (context.datasetIndex === 0) {
-                                return `Mínimo: R$ ${min.toFixed(2).replace('.', ',')}`;
+                                return `Mínimo: R$ ${min.toFixed(2).replace('.', ',')} (${minProduct ? minProduct.pharmacy : 'N/A'})`;
                             } else if (context.datasetIndex === 1) {
-                                return `Máximo: R$ ${max.toFixed(2).replace('.', ',')}`;
+                                return `Máximo: R$ ${max.toFixed(2).replace('.', ',')} (${maxProduct ? maxProduct.pharmacy : 'N/A'})`;
                             }
                             return '';
                         }
