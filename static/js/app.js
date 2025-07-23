@@ -22,6 +22,16 @@ window.descontoBadgePlugin = {
         const titleX = chart.scales.x.left - 20;
         const titleY = chart.chartArea.top - 10;
         ctx.fillText('Ranking', titleX, titleY);
+        // Desenhar título "Desconto" acima dos badges de desconto
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 12px Segoe UI, Arial';
+        const descontoTitleX = chart.chartArea.right + 72; // ainda mais para a direita
+        ctx.fillText('Desconto', descontoTitleX, titleY);
+        // Desenhar título "Preço (R$)" centralizado acima do gráfico
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 12px Segoe UI, Arial';
+        const precoTitleX = (chart.chartArea.left + chart.chartArea.right) / 2;
+        ctx.fillText('Preço (R$)', precoTitleX, titleY);
         chart.getDatasetMeta(0).data.forEach((bar, i) => {
             const discount = dataset.discounts[i];
             const price = dataset.data[i];
@@ -114,15 +124,15 @@ window.descontoBadgePlugin = {
             
             if (discount || (dataset.minDiscounts && dataset.minDiscounts[i] !== null)) {
                 // --- Ajuste responsivo do badge ---
-                let badgeWidth = 40, badgeHeight = 20, badgeFont = 'bold 12px Segoe UI, Arial';
+                let badgeWidth = 36, badgeHeight = 16, badgeFont = 'bold 10px Segoe UI, Arial';
                 if (window.innerWidth < 576) {
-                    badgeWidth = 28;
-                    badgeHeight = 14;
-                    badgeFont = 'bold 9px Segoe UI, Arial';
+                    badgeWidth = 22;
+                    badgeHeight = 11;
+                    badgeFont = 'bold 7px Segoe UI, Arial';
                 } else if (window.innerWidth < 992) {
-                    badgeWidth = 32;
-                    badgeHeight = 16;
-                    badgeFont = 'bold 10px Segoe UI, Arial';
+                    badgeWidth = 28;
+                    badgeHeight = 13;
+                    badgeFont = 'bold 8px Segoe UI, Arial';
                 }
                 
                 // Verificar se há múltiplos descontos para esta marca
@@ -139,8 +149,8 @@ window.descontoBadgePlugin = {
                     // Ajustar largura do badge baseado no texto
                     const textWidth = ctx.measureText(maxText).width;
                     adjustedBadgeWidth = Math.max(badgeWidth, textWidth + 16);
-                    // Alinhar badge à direita do gráfico
-                    let x = chart.chartArea.right - adjustedBadgeWidth - 8;
+                    // Badge completamente fora do gráfico
+                    let x = chart.chartArea.right + 12;
                     
                     // Desenhar badge
                     ctx.fillStyle = '#dc3545';
@@ -166,7 +176,7 @@ window.descontoBadgePlugin = {
                     
                 } else {
                     // Badge único (comportamento original)
-                    let x = chart.chartArea.right - badgeWidth - 8;
+                    let x = chart.chartArea.right + 12;
                     let y = textY - badgeHeight / 2;
                     ctx.fillStyle = '#dc3545';
                     ctx.beginPath();
@@ -1497,7 +1507,7 @@ function renderPriceChart(products) {
                     top: isMobile ? 2 : 20,
                     bottom: isMobile ? 2 : 20,
                     left: isMobile ? 6 : 10,
-                    right: 0
+                    right: isMobile ? 60 : 90 // Adiciona espaço à direita para os badges
                 }
             },
             plugins: {
@@ -1530,7 +1540,7 @@ function renderPriceChart(products) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: { display: true, text: 'Preço (R$)', color: '#2d2e4a', font: { weight: 'bold', size: isMobile ? 9 : 15 } },
+                    // title removido
                     grid: { display: false },
                     ticks: {
                         color: '#2d2e4a',
