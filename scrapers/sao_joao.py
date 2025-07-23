@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from utils.product_unifier import ProductUnifier
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configuração básica de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -124,6 +125,114 @@ class SaoJoaoScraper(BaseScraper):
             except Exception as e:
                 self.logger.error(f"Erro ao extrair produto: {e}")
                 continue
+        # Paralelizar busca de marca nas páginas específicas
+        def fetch_brand_with_own_driver(product):
+            product_url = product.get('product_url')
+            if not product_url:
+                return (product_url, product.get('brand'))
+            from selenium import webdriver
+            from selenium.webdriver.chrome.service import Service
+            from selenium.webdriver.chrome.options import Options
+            import platform
+            import os
+            chrome_options = Options()
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument("--window-size=1920,1080")
+            CHROMEDRIVER_DIR = os.path.join(os.getcwd(), "chromedriver_bin")
+            chromedriver_path = os.path.join(CHROMEDRIVER_DIR, "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+            if not os.path.exists(chromedriver_path):
+                chromedriver_path_alt = os.path.join(CHROMEDRIVER_DIR, "chromedriver-win64", "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+                if os.path.exists(chromedriver_path_alt):
+                    chromedriver_path = chromedriver_path_alt
+            service = Service(chromedriver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            try:
+                # Lógica de _extract_brand_from_product_page, mas com driver local
+                driver.get(product_url)
+                import time
+                time.sleep(2)
+                # Tentar aceitar cookies se o botão existir
+                try:
+                    from selenium.webdriver.common.by import By
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    from selenium.webdriver.support import expected_conditions as EC
+                    WebDriverWait(driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//button[contains(translate(., 'ACEITAR', 'aceitar'), 'aceitar') or contains(., 'Aceitar') or contains(., 'OK') or contains(., 'Ok') or contains(., 'ok') or contains(., 'Concordo') or contains(., 'concordo')]")
+                        )
+                    ).click()
+                except Exception:
+                    pass
+                time.sleep(1)
+                # Buscar marca usando os seletores já existentes
+                brand = None
+                try:
+                    brand_selectors = [
+                        "span.vtex-store-components-3-x-productBrandName",
+                        ".vtex-store-components-3-x-productBrandName",
+                        "span[class*='productBrandName']",
+                        ".vtex-product-identifier-0-x-product-identifier__value",
+                        "span[class*='brand']",
+                        ".vtex-product-identifier-0-x-product-identifier__value",
+                        "span[class*='manufacturer']",
+                        ".vtex-product-identifier-0-x-product-identifier__value",
+                        "[class*='brand']",
+                        "[class*='manufacturer']",
+                        "[class*='productBrand']"
+                    ]
+                    for selector in brand_selectors:
+                        try:
+                            brand_element = driver.find_element(By.CSS_SELECTOR, selector)
+                            brand_text = brand_element.text.strip()
+                            if brand_text and len(brand_text) > 1:
+                                return (product_url, brand_text)
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+                # Se não encontrar, tentar extrair do título
+                try:
+                    page_title = driver.title
+                    if page_title:
+                        import re
+                        brand_match = re.search(r'^([^-]+)', page_title)
+                        if brand_match:
+                            brand_text = brand_match.group(1).strip()
+                            if brand_text and len(brand_text) > 2:
+                                return (product_url, brand_text)
+                except Exception:
+                    pass
+                return (product_url, "Marca não disponível")
+            finally:
+                driver.quit()
+        # Coletar produtos que precisam buscar marca
+        products_to_update = [p for p in products if p.get('brand') in [None, '', 'Marca não disponível'] and p.get('product_url')]
+        if products_to_update:
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                future_to_url = {executor.submit(fetch_brand_with_own_driver, p): p for p in products_to_update}
+                url_to_brand = {}
+                for future in as_completed(future_to_url):
+                    url, brand = future.result()
+                    # Capitalizar brand, exceto EMS
+                    if isinstance(brand, str) and brand.strip():
+                        if brand.strip().upper() == 'EMS':
+                            brand = 'EMS'
+                        else:
+                            brand = ' '.join([w.capitalize() for w in brand.strip().split()])
+                    url_to_brand[url] = brand
+                # Atualizar produtos
+                for p in products:
+                    if p.get('product_url') in url_to_brand:
+                        p['brand'] = url_to_brand[p['product_url']]
+                        # Garantir que brand nunca seja string vazia
+                        if not p['brand'] or not str(p['brand']).strip():
+                            p['brand'] = "Marca não disponível"
         return products
 
     def _extract_product_info(self, section, position=None, search_term=None):

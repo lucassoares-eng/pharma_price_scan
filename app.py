@@ -6,6 +6,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import os
 import platform
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Importar funções do base_scraper
 from scrapers.base_scraper import get_chrome_version, get_chromedriver_url, update_chromedriver, get_os_type
@@ -210,63 +211,72 @@ def search_medicines():
                 'from_cache': True
             })
         
-        # Cache não encontrado ou expirado - fazer nova busca
         print(f"Fazendo nova busca para: {medicine_description}")
         
-        # Obter driver global
-        driver = get_global_driver()
+        # Função para rodar cada scraper em thread separada
+        def run_scraper(scraper_class, medicine_description):
+            # Cada thread precisa de seu próprio driver
+            from selenium import webdriver
+            from selenium.webdriver.chrome.service import Service
+            from selenium.webdriver.chrome.options import Options
+            import platform
+            import os
+            chrome_options = Options()
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument("--window-size=1920,1080")
+            CHROMEDRIVER_DIR = os.path.join(os.getcwd(), "chromedriver_bin")
+            chromedriver_path = os.path.join(CHROMEDRIVER_DIR, "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+            if not os.path.exists(chromedriver_path):
+                chromedriver_path_alt = os.path.join(CHROMEDRIVER_DIR, "chromedriver-win64", "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+                if os.path.exists(chromedriver_path_alt):
+                    chromedriver_path = chromedriver_path_alt
+            service = Service(chromedriver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            try:
+                scraper = scraper_class(driver=driver)
+                result = scraper.search(medicine_description)
+            finally:
+                driver.quit()
+            return result
         
-        # Lista de scrapers disponíveis
         scrapers = {
-            'droga_raia': DrogaRaiaScraper(driver=driver),
-            'sao_joao': SaoJoaoScraper(driver=driver)
+            'droga_raia': DrogaRaiaScraper,
+            'sao_joao': SaoJoaoScraper
         }
-        
         results = {}
-        
-        # Executar busca em cada farmácia
-        for pharmacy_name, scraper in scrapers.items():
-            tried_restart = False
-            while True:
+        with ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
+            future_to_pharmacy = {
+                executor.submit(run_scraper, scraper_class, medicine_description): pharmacy_name
+                for pharmacy_name, scraper_class in scrapers.items()
+            }
+            for future in as_completed(future_to_pharmacy):
+                pharmacy_name = future_to_pharmacy[future]
                 try:
-                    pharmacy_results = scraper.search(medicine_description)
-                    results[pharmacy_name] = pharmacy_results
-                    break
+                    results[pharmacy_name] = future.result()
                 except Exception as e:
-                    error_msg = str(e)
-                    if (not tried_restart) and ('invalid session id' in error_msg.lower()):
-                        # Reiniciar driver global e tentar novamente uma vez
-                        cleanup_global_driver()
-                        setup_global_driver()
-                        # Recriar o scraper específico
-                        if pharmacy_name == 'droga_raia':
-                            scrapers[pharmacy_name] = DrogaRaiaScraper(driver=get_global_driver())
-                        elif pharmacy_name == 'sao_joao':
-                            scrapers[pharmacy_name] = SaoJoaoScraper(driver=get_global_driver())
-                        tried_restart = True
-                        continue
                     results[pharmacy_name] = {
-                        'error': f'Erro ao buscar em {pharmacy_name}: {error_msg}',
+                        'error': f'Erro ao buscar em {pharmacy_name}: {str(e)}',
                         'products': []
                     }
-                    break
-        
         # Salvar resultados no cache (apenas se não houver erro)
         has_error = any('error' in v and v['error'] for v in results.values())
         has_products = any(v.get('products') for v in results.values())
         if not has_error and has_products:
             cache_mgr.save_cache_results(medicine_description, results)
-        
         # Processar produtos com ProductUnifier
         processed_results = process_pharmacy_results(results, medicine_description)
-        
         return jsonify({
             'medicine_description': medicine_description,
             'results': results,
             'processed_results': processed_results,
             'from_cache': False
         })
-        
     except Exception as e:
         return jsonify({'error': f'Erro interno do servidor: {str(e)}'}), 500
 
