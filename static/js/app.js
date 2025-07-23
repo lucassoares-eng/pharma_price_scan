@@ -49,8 +49,15 @@ window.descontoBadgePlugin = {
             ctx.textBaseline = 'middle';
             // Centro da barra
             const barStart = chart.scales.x.left;
-            const centerX = barStart + (bar.x - barStart) / 2;
-            let textX = centerX;
+            // const centerX = barStart + (bar.x - barStart) / 2;
+            // let textX = centerX;
+            // let textY = bar.y;
+            // let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
+            // ctx.fillStyle = isSelected ? '#222' : '#fff';
+            // ctx.fillText(priceLabel, textX, textY);
+            // Alinhar à direita da barra
+            ctx.textAlign = 'right';
+            let textX = bar.x - 6; // 6px de margem à esquerda do final da barra
             let textY = bar.y;
             let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
             ctx.fillStyle = isSelected ? '#222' : '#fff';
