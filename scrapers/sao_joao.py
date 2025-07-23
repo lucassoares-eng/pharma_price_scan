@@ -1,6 +1,7 @@
 import re
 import logging
 import time
+import datetime
 from .base_scraper import BaseScraper
 from urllib.parse import quote_plus
 from selenium.webdriver.common.by import By
@@ -126,10 +127,15 @@ class SaoJoaoScraper(BaseScraper):
                 self.logger.error(f"Erro ao extrair produto: {e}")
                 continue
         # Paralelizar busca de marca nas páginas específicas
-        def fetch_brand_with_own_driver(product):
+        def fetch_brand_and_price_with_own_driver(product):
             product_url = product.get('product_url')
+            reason_open = []
+            if product.get('brand') in [None, '', 'Marca não disponível']:
+                reason_open.append('marca')
+            if product.get('price') == 'Preço não disponível' or product.get('original_price') == 'Preço não disponível':
+                reason_open.append('preço')
             if not product_url:
-                return (product_url, product.get('brand'))
+                return (product_url, product.get('brand'), product.get('price'), product.get('original_price'))
             from selenium import webdriver
             from selenium.webdriver.chrome.service import Service
             from selenium.webdriver.chrome.options import Options
@@ -153,9 +159,8 @@ class SaoJoaoScraper(BaseScraper):
             service = Service(chromedriver_path)
             driver = webdriver.Chrome(service=service, options=chrome_options)
             try:
-                # Lógica de _extract_brand_from_product_page, mas com driver local
-                driver.get(product_url)
                 import time
+                driver.get(product_url)
                 time.sleep(2)
                 # Tentar aceitar cookies se o botão existir
                 try:
@@ -170,7 +175,7 @@ class SaoJoaoScraper(BaseScraper):
                 except Exception:
                     pass
                 time.sleep(1)
-                # Buscar marca usando os seletores já existentes
+                # Buscar marca
                 brand = None
                 try:
                     brand_selectors = [
@@ -191,48 +196,94 @@ class SaoJoaoScraper(BaseScraper):
                             brand_element = driver.find_element(By.CSS_SELECTOR, selector)
                             brand_text = brand_element.text.strip()
                             if brand_text and len(brand_text) > 1:
-                                return (product_url, brand_text)
+                                brand = brand_text
+                                break
                         except Exception:
                             continue
                 except Exception:
                     pass
                 # Se não encontrar, tentar extrair do título
+                if not brand:
+                    try:
+                        page_title = driver.title
+                        if page_title:
+                            import re
+                            brand_match = re.search(r'^([^-]+)', page_title)
+                            if brand_match:
+                                brand_text = brand_match.group(1).strip()
+                                if brand_text and len(brand_text) > 2:
+                                    brand = brand_text
+                    except Exception:
+                        pass
+                if not brand:
+                    brand = "Marca não disponível"
+                # Buscar preço
+                price = product.get('price', 'Preço não disponível')
+                original_price = product.get('original_price', 'Preço não disponível')
                 try:
-                    page_title = driver.title
-                    if page_title:
-                        import re
-                        brand_match = re.search(r'^([^-]+)', page_title)
-                        if brand_match:
-                            brand_text = brand_match.group(1).strip()
-                            if brand_text and len(brand_text) > 2:
-                                return (product_url, brand_text)
+                    # Preço atual
+                    price_span = driver.find_element(By.CSS_SELECTOR, 'span.sjdigital-custom-apps-7-x-sellingPriceValue')
+                    price_text = price_span.text.strip()
+                    price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
+                    if price_match:
+                        price = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                        original_price = price
                 except Exception:
                     pass
-                return (product_url, "Marca não disponível")
+                try:
+                    # Preço original
+                    list_price_span = driver.find_element(By.CSS_SELECTOR, 'span.sjdigital-custom-apps-7-x-listPriceValue')
+                    list_price_text = list_price_span.text.strip()
+                    list_price_match = re.search(r'R\$[\s]*([\d,.]+)', list_price_text)
+                    if list_price_match:
+                        original_price = float(list_price_match.group(1).replace('.', '').replace(',', '.'))
+                except Exception:
+                    pass
+                now = datetime.datetime.now().strftime('%H:%M:%S')
+                logger.info(f"[SaoJoaoScraper] [{now}] Abrindo página do produto para buscar: {', '.join(reason_open)} | URL: {product_url}")
+                now2 = datetime.datetime.now().strftime('%H:%M:%S')
+                logger.info(f"[SaoJoaoScraper] [{now2}] Resultado da extração na página do produto: marca='{brand}', preço={price}, original_price={original_price}")
+                return (product_url, brand, price, original_price)
             finally:
                 driver.quit()
-        # Coletar produtos que precisam buscar marca
-        products_to_update = [p for p in products if p.get('brand') in [None, '', 'Marca não disponível'] and p.get('product_url')]
+        # Coletar produtos que precisam buscar marca ou preço
+        products_to_update = [p for p in products if (p.get('brand') in [None, '', 'Marca não disponível'] or p.get('price') == 'Preço não disponível' or p.get('original_price') == 'Preço não disponível') and p.get('product_url')]
         if products_to_update:
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                future_to_url = {executor.submit(fetch_brand_with_own_driver, p): p for p in products_to_update}
-                url_to_brand = {}
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_url = {executor.submit(fetch_brand_and_price_with_own_driver, p): p for p in products_to_update}
+                url_to_data = {}
                 for future in as_completed(future_to_url):
-                    url, brand = future.result()
+                    url, brand, price, original_price = future.result()
                     # Capitalizar brand, exceto EMS
                     if isinstance(brand, str) and brand.strip():
                         if brand.strip().upper() == 'EMS':
                             brand = 'EMS'
                         else:
                             brand = ' '.join([w.capitalize() for w in brand.strip().split()])
-                    url_to_brand[url] = brand
+                    url_to_data[url] = (brand, price, original_price)
                 # Atualizar produtos
                 for p in products:
-                    if p.get('product_url') in url_to_brand:
-                        p['brand'] = url_to_brand[p['product_url']]
+                    if p.get('product_url') in url_to_data:
+                        brand, price, original_price = url_to_data[p['product_url']]
+                        p['brand'] = brand
+                        p['price'] = price
+                        p['original_price'] = original_price
                         # Garantir que brand nunca seja string vazia
                         if not p['brand'] or not str(p['brand']).strip():
                             p['brand'] = "Marca não disponível"
+        # Filtrar produtos com '+' no nome que não correspondem ao termo de busca
+        def is_valid_plus_product(product, search_term):
+            name = product.get('name', '').lower()
+            search = search_term.lower()
+            if '+' in name:
+                after_plus = name.split('+', 1)[1]
+                import re
+                words = re.findall(r'\b\w+\b', after_plus)
+                for word in words:
+                    if word not in search:
+                        return False
+            return True
+        products = [p for p in products if is_valid_plus_product(p, search_term)]
         return products
 
     def _extract_product_info(self, section, position=None, search_term=None):

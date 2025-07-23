@@ -1,7 +1,9 @@
 import re
 import logging
+import datetime
 from .base_scraper import BaseScraper
 from utils.product_unifier import ProductUnifier
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Configuração básica de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -53,15 +55,184 @@ class DrogaRaiaScraper(BaseScraper):
         self.logger.info(f"Quantidade de <article> encontrados: {len(product_articles)}")
         for idx, article in enumerate(product_articles, 1):
             try:
-                product = self._extract_product_info(article, idx, search_term)
+                product = self._extract_product_info(article, idx, search_term, skip_open=True)
                 if product:
                     products.append(product)
             except Exception as e:
                 self.logger.error(f"Erro ao extrair produto: {e}")
                 continue
+        # Paralelizar abertura das páginas específicas
+        def fetch_brand_and_price_with_own_driver(product):
+            import datetime
+            product_url = product.get('product_url')
+            reason_open = []
+            if product.get('brand') in [None, '', 'Marca não disponível']:
+                reason_open.append('marca')
+            if product.get('price') == 'Preço não disponível' or product.get('original_price') == 'Preço não disponível':
+                reason_open.append('preço')
+            if not product_url:
+                return (product_url, product.get('brand'), product.get('price'), product.get('original_price'), product.get('discount_percentage'), product.get('has_discount'))
+            from selenium import webdriver
+            from selenium.webdriver.chrome.service import Service
+            from selenium.webdriver.chrome.options import Options
+            import platform
+            import os
+            chrome_options = Options()
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            chrome_options.add_argument("--headless=new")
+            chrome_options.add_argument("--window-size=1920,1080")
+            CHROMEDRIVER_DIR = os.path.join(os.getcwd(), "chromedriver_bin")
+            chromedriver_path = os.path.join(CHROMEDRIVER_DIR, "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+            if not os.path.exists(chromedriver_path):
+                chromedriver_path_alt = os.path.join(CHROMEDRIVER_DIR, "chromedriver-win64", "chromedriver.exe" if platform.system() == "Windows" else "chromedriver")
+                if os.path.exists(chromedriver_path_alt):
+                    chromedriver_path = chromedriver_path_alt
+            service = Service(chromedriver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            try:
+                now = datetime.datetime.now().strftime('%H:%M:%S')
+                logger.info(f"[DrogaRaiaScraper] [{now}] (PARALLEL) Abrindo página do produto para buscar: {', '.join(reason_open)} | URL: {product_url}")
+                driver.get(product_url)
+                import time
+                time.sleep(2)
+                # Marca
+                brand = None
+                li_tags = []
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(driver.page_source, 'html.parser')
+                    li_tags = soup.find_all('li')
+                except Exception:
+                    pass
+                for li in li_tags:
+                    spans = li.find_all('span')
+                    if len(spans) >= 2:
+                        label = spans[0].get_text(strip=True).lower()
+                        if 'fabricante' in label:
+                            value_span = spans[1]
+                            a_tag = value_span.find('a')
+                            if a_tag and a_tag.get_text(strip=True):
+                                brand = a_tag.get_text(strip=True)
+                            else:
+                                value_text = value_span.get_text(strip=True)
+                                if value_text:
+                                    brand = value_text
+                            break
+                if not brand:
+                    for li in li_tags:
+                        spans = li.find_all('span')
+                        if len(spans) >= 2:
+                            label = spans[0].get_text(strip=True).lower()
+                            if 'marca' in label:
+                                value_span = spans[1]
+                                a_tag = value_span.find('a')
+                                if a_tag and a_tag.get_text(strip=True):
+                                    brand = a_tag.get_text(strip=True)
+                                else:
+                                    value_text = value_span.get_text(strip=True)
+                                    if value_text:
+                                        brand = value_text
+                                break
+                # Preço
+                price = product.get('price', 'Preço não disponível')
+                original_price = product.get('original_price', 'Preço não disponível')
+                discount_percentage = product.get('discount_percentage', 0)
+                has_discount = product.get('has_discount', False)
+                try:
+                    # Preço atual
+                    price_span = soup.find('span', class_='sc-fd6fe09f-0 jRRyrf price-pdp-content')
+                    if not price_span:
+                        price_span = soup.find('span', string=lambda t: t and 'R$' in t)
+                    if price_span:
+                        price_text = price_span.get_text(strip=True)
+                        price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
+                        if price_match:
+                            price = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                            original_price = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                except Exception:
+                    pass
+                try:
+                    # Preço original
+                    original_price_span = soup.find('span', class_='sc-14e14dc8-0 kpLpXu')
+                    if not original_price_span:
+                        all_spans = soup.find_all('span', string=lambda t: t and 'R$' in t)
+                        for span in all_spans:
+                            if price_span and span == price_span:
+                                continue
+                            original_price_span = span
+                            break
+                    if original_price_span:
+                        original_price_text = original_price_span.get_text(strip=True)
+                        original_price_match = re.search(r'R\$[\s]*([\d,.]+)', original_price_text)
+                        if original_price_match:
+                            original_price = float(original_price_match.group(1).replace('.', '').replace(',', '.'))
+                except Exception:
+                    pass
+                try:
+                    # Desconto
+                    discount_span = soup.find('span', class_='sc-311eb643-0 igSiSz')
+                    if discount_span:
+                        discount_text = discount_span.get_text(strip=True)
+                        discount_match = re.search(r'(\d+)%', discount_text)
+                        if discount_match:
+                            discount_percentage = int(discount_match.group(1))
+                            has_discount = True
+                except Exception:
+                    pass
+                now2 = datetime.datetime.now().strftime('%H:%M:%S')
+                logger.info(f"[DrogaRaiaScraper] [{now2}] (PARALLEL) Resultado da extração na página do produto: marca='{brand}', preço={{'current_price': {price}, 'original_price': {original_price}}}, desconto={{'has_discount': {has_discount}, 'percentage': {discount_percentage}}}")
+                return (product_url, brand, price, original_price, discount_percentage, has_discount)
+            finally:
+                driver.quit()
+        # Coletar produtos que precisam buscar marca ou preço
+        products_to_update = [p for p in products if (p.get('brand') in [None, '', 'Marca não disponível'] or p.get('price') == 'Preço não disponível' or p.get('original_price') == 'Preço não disponível') and p.get('product_url')]
+        if products_to_update:
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                future_to_url = {executor.submit(fetch_brand_and_price_with_own_driver, p): p for p in products_to_update}
+                url_to_data = {}
+                for future in as_completed(future_to_url):
+                    url, brand, price, original_price, discount_percentage, has_discount = future.result()
+                    # Capitalizar brand, exceto EMS
+                    if isinstance(brand, str) and brand.strip():
+                        if brand.strip().upper() == 'EMS':
+                            brand = 'EMS'
+                        else:
+                            brand = ' '.join([w.capitalize() for w in brand.strip().split()])
+                    url_to_data[url] = (brand, price, original_price, discount_percentage, has_discount)
+                # Atualizar produtos
+                for p in products:
+                    if p.get('product_url') in url_to_data:
+                        brand, price, original_price, discount_percentage, has_discount = url_to_data[p['product_url']]
+                        p['brand'] = brand
+                        p['price'] = price
+                        p['original_price'] = original_price
+                        p['discount_percentage'] = discount_percentage
+                        p['has_discount'] = has_discount
+                        # Garantir que brand nunca seja string vazia
+                        if not p['brand'] or not str(p['brand']).strip():
+                            p['brand'] = "Marca não disponível"
+        # Filtrar produtos com '+' no nome que não correspondem ao termo de busca
+        def is_valid_plus_product(product, search_term):
+            name = product.get('name', '').lower()
+            search = search_term.lower()
+            if '+' in name:
+                after_plus = name.split('+', 1)[1]
+                # Pega só as palavras (remove pontuação)
+                import re
+                words = re.findall(r'\b\w+\b', after_plus)
+                for word in words:
+                    if word not in search:
+                        return False
+            return True
+        products = [p for p in products if is_valid_plus_product(p, search_term)]
         return products
 
-    def _extract_product_info(self, article, position=None, search_term=None):
+    def _extract_product_info(self, article, position=None, search_term=None, skip_open=False):
         """
         Extrai informações de um produto do HTML
         """
@@ -105,6 +276,8 @@ class DrogaRaiaScraper(BaseScraper):
             discount_info = self._extract_discount_info(article)
             # --- Lógica de busca condicional ---
             final_brand = brand
+            need_open_product_page = False
+            reason_open = []
             if name and search_term:
                 normalized_name = name.lower().strip()
                 normalized_search = search_term.lower().strip()
@@ -117,26 +290,26 @@ class DrogaRaiaScraper(BaseScraper):
                 )
                 found_lab_name = found_lab['laboratory'] if found_lab and found_lab.get('laboratory') else ""
                 if first_word == normalized_search.split()[0] and not found_lab_name:
-                    self.logger.info(f"[DrogaRaiaScraper] Entrando no fluxo de extração de fabricante na página do produto: {product_link}")
-                    extracted_brand = self._extract_brand_from_product_page(product_link)
-                    self.logger.info(f"[DrogaRaiaScraper] Fabricante extraído da página do produto: {extracted_brand}")
-                    final_brand = extracted_brand if extracted_brand else None
-                    # Retorne o produto imediatamente, pois não faz sentido extrair outros campos de uma página de produto
-                    product_data = {
-                        'name': name,
-                        'brand': final_brand,
-                        'description': description,
-                        'price': price_info['current_price'],
-                        'original_price': price_info['original_price'],
-                        'discount_percentage': discount_info['percentage'],
-                        'product_url': product_link,
-                        'has_discount': discount_info['has_discount'],
-                        'position': position
-                    }
-                    self.logger.info(f"[DrogaRaiaScraper] Produto retornado após extração de fabricante: {product_data}")
-                    return product_data
+                    need_open_product_page = True
+                    reason_open.append('marca')
                 else:
                     final_brand = found_lab_name or brand
+            # Se faltar preço, também precisa abrir a página
+            if ((price_info['current_price'] == 'Preço não disponível' or price_info['original_price'] == 'Preço não disponível') and product_link):
+                need_open_product_page = True
+                reason_open.append('preço')
+            # Se precisar abrir a página do produto, extrair marca e preço juntos
+            if need_open_product_page and product_link:
+                now = datetime.datetime.now().strftime('%H:%M:%S')
+                self.logger.info(f"[DrogaRaiaScraper] [{now}] Abrindo página do produto para buscar: {', '.join(reason_open)} | URL: {product_link}")
+                extracted_brand, extracted_price_info, extracted_discount_info = self._extract_brand_and_price_from_product_page(product_link)
+                now2 = datetime.datetime.now().strftime('%H:%M:%S')
+                self.logger.info(f"[DrogaRaiaScraper] [{now2}] Resultado da extração na página do produto: marca='{extracted_brand}', preço={extracted_price_info}, desconto={extracted_discount_info}")
+                final_brand = extracted_brand if extracted_brand else final_brand
+                if extracted_price_info:
+                    price_info = extracted_price_info
+                if extracted_discount_info:
+                    discount_info = extracted_discount_info
             # Capitalizar brand, exceto EMS
             brand_value = final_brand
             if isinstance(brand_value, str) and brand_value.strip():
@@ -155,67 +328,7 @@ class DrogaRaiaScraper(BaseScraper):
                 'has_discount': discount_info['has_discount'],
                 'position': position
             }
-            # Fallback: buscar preço na página do produto se não disponível
-            if ((product_data['price'] == 'Preço não disponível' or product_data['original_price'] == 'Preço não disponível') and product_link):
-                try:
-                    response_prod = self.make_request(product_link)
-                    soup_prod = self.parse_html(response_prod['content'])
-                    # Preço atual
-                    price_span = soup_prod.find('span', class_='sc-fd6fe09f-0 jRRyrf price-pdp-content')
-                    if not price_span:
-                        price_span = soup_prod.find('span', string=lambda t: t and 'R$' in t)
-                    if price_span:
-                        price_text = price_span.get_text(strip=True)
-                        price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
-                        if price_match:
-                            product_data['price'] = float(price_match.group(1).replace('.', '').replace(',', '.'))
-                    # Preço original
-                    original_price_span = soup_prod.find('span', class_='sc-14e14dc8-0 kpLpXu')
-                    if not original_price_span:
-                        all_spans = soup_prod.find_all('span', string=lambda t: t and 'R$' in t)
-                        for span in all_spans:
-                            if price_span and span == price_span:
-                                continue
-                            original_price_span = span
-                            break
-                    if original_price_span:
-                        original_price_text = original_price_span.get_text(strip=True)
-                        original_price_match = re.search(r'R\$[\s]*([\d,.]+)', original_price_text)
-                        if original_price_match:
-                            product_data['original_price'] = float(original_price_match.group(1).replace('.', '').replace(',', '.'))
-                    # Desconto
-                    discount_span = soup_prod.find('span', class_='sc-311eb643-0 igSiSz')
-                    if discount_span:
-                        discount_text = discount_span.get_text(strip=True)
-                        discount_match = re.search(r'(\d+)%', discount_text)
-                        if discount_match:
-                            product_data['discount_percentage'] = int(discount_match.group(1))
-                            product_data['has_discount'] = True
-                    # Fallback robusto: todos os <span> com 'R$'
-                    if (product_data['price'] == 'Preço não disponível' or product_data['original_price'] == 'Preço não disponível'):
-                        all_price_spans = soup_prod.find_all('span', string=lambda t: t and 'R$' in t)
-                        prices_found = []
-                        for span in all_price_spans:
-                            price_text = span.get_text(strip=True)
-                            price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
-                            if price_match:
-                                value = float(price_match.group(1).replace('.', '').replace(',', '.'))
-                                prices_found.append(value)
-                        if prices_found:
-                            if len(prices_found) >= 2:
-                                product_data['original_price'] = max(prices_found)
-                                product_data['price'] = min(prices_found)
-                            else:
-                                product_data['price'] = prices_found[0]
-                                product_data['original_price'] = prices_found[0]
-                            self.logger.info(f"[DrogaRaiaScraper] Preços encontrados na página do produto: {prices_found}")
-                        else:
-                            self.logger.warning(f"[DrogaRaiaScraper] Nenhum preço encontrado na página do produto: {product_link}")
-                            price_container = soup_prod.find('div', id='pdp-price-container')
-                            if price_container:
-                                self.logger.warning(f"[DrogaRaiaScraper] HTML do bloco de preço:\n{price_container.prettify()}")
-                except Exception as e:
-                    self.logger.warning(f"[DrogaRaiaScraper] Falha ao buscar preço na página do produto: {e}")
+            self.logger.info(f"[DrogaRaiaScraper] Produto final: {product_data}")
             return product_data
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
@@ -303,61 +416,101 @@ class DrogaRaiaScraper(BaseScraper):
                 'percentage': 0
             } 
 
-    def _extract_brand_from_product_page(self, product_url):
+    def _extract_brand_and_price_from_product_page(self, product_url):
         """
-        Acessa a página do produto e tenta extrair a marca real, priorizando o Fabricante.
+        Acessa a página do produto e extrai marca, preço e desconto juntos.
         """
         try:
             if not product_url:
-                return None
+                return None, None, None
             response = self.make_request(product_url)
             soup = self.parse_html(response['content'])
-            # 1. Procurar pelo <li> cujo <span> seja 'Fabricante' (case insensitive, robusto)
+            # Marca
+            brand = None
             li_tags = soup.find_all('li')
             for li in li_tags:
                 spans = li.find_all('span')
                 if len(spans) >= 2:
                     label = spans[0].get_text(strip=True).lower()
                     if 'fabricante' in label:
-                        # O valor pode estar em <span> ou <a> dentro do segundo span
                         value_span = spans[1]
                         a_tag = value_span.find('a')
                         if a_tag and a_tag.get_text(strip=True):
-                            return a_tag.get_text(strip=True)
-                        # Se não houver <a>, pegar texto do <span>
-                        value_text = value_span.get_text(strip=True)
-                        if value_text:
-                            return value_text
-            # 2. Se não achar, procurar pelo <li> cujo <span> seja 'Marca'
-            for li in li_tags:
-                spans = li.find_all('span')
-                if len(spans) >= 2:
-                    label = spans[0].get_text(strip=True).lower()
-                    if 'marca' in label:
-                        value_span = spans[1]
-                        a_tag = value_span.find('a')
-                        if a_tag and a_tag.get_text(strip=True):
-                            return a_tag.get_text(strip=True)
-                        value_text = value_span.get_text(strip=True)
-                        if value_text:
-                            return value_text
-            # 3. Fallbacks antigos
-            dt_tags = soup.find_all('dt')
-            for dt in dt_tags:
-                if 'marca' in dt.get_text(strip=True).lower() or 'fabricante' in dt.get_text(strip=True).lower():
-                    dd = dt.find_next_sibling('dd')
-                    if dd:
-                        return dd.get_text(strip=True)
-            possible_labels = ['marca', 'fabricante']
-            for label in possible_labels:
-                label_elem = soup.find(string=lambda t: t and label in t.lower())
-                if label_elem:
-                    parent = label_elem.parent
-                    if parent and parent.find_next_sibling():
-                        return parent.find_next_sibling().get_text(strip=True)
-            meta_brand = soup.find('meta', {'name': 'brand'})
-            if meta_brand and meta_brand.get('content'):
-                return meta_brand['content']
+                            brand = a_tag.get_text(strip=True)
+                        else:
+                            value_text = value_span.get_text(strip=True)
+                            if value_text:
+                                brand = value_text
+                        break
+            if not brand:
+                for li in li_tags:
+                    spans = li.find_all('span')
+                    if len(spans) >= 2:
+                        label = spans[0].get_text(strip=True).lower()
+                        if 'marca' in label:
+                            value_span = spans[1]
+                            a_tag = value_span.find('a')
+                            if a_tag and a_tag.get_text(strip=True):
+                                brand = a_tag.get_text(strip=True)
+                            else:
+                                value_text = value_span.get_text(strip=True)
+                                if value_text:
+                                    brand = value_text
+                            break
+            # Preço
+            price_info = {'current_price': 'Preço não disponível', 'original_price': 'Preço não disponível'}
+            discount_info = {'has_discount': False, 'percentage': 0}
+            # Preço atual
+            price_span = soup.find('span', class_='sc-fd6fe09f-0 jRRyrf price-pdp-content')
+            if not price_span:
+                price_span = soup.find('span', string=lambda t: t and 'R$' in t)
+            if price_span:
+                price_text = price_span.get_text(strip=True)
+                price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
+                if price_match:
+                    price_info['current_price'] = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                    price_info['original_price'] = float(price_match.group(1).replace('.', '').replace(',', '.'))
+            # Preço original
+            original_price_span = soup.find('span', class_='sc-14e14dc8-0 kpLpXu')
+            if not original_price_span:
+                all_spans = soup.find_all('span', string=lambda t: t and 'R$' in t)
+                for span in all_spans:
+                    if price_span and span == price_span:
+                        continue
+                    original_price_span = span
+                    break
+            if original_price_span:
+                original_price_text = original_price_span.get_text(strip=True)
+                original_price_match = re.search(r'R\$[\s]*([\d,.]+)', original_price_text)
+                if original_price_match:
+                    price_info['original_price'] = float(original_price_match.group(1).replace('.', '').replace(',', '.'))
+            # Desconto
+            discount_span = soup.find('span', class_='sc-311eb643-0 igSiSz')
+            if discount_span:
+                discount_text = discount_span.get_text(strip=True)
+                discount_match = re.search(r'(\d+)%', discount_text)
+                if discount_match:
+                    discount_info['percentage'] = int(discount_match.group(1))
+                    discount_info['has_discount'] = True
+            # Fallback robusto: todos os <span> com 'R$'
+            if (price_info['current_price'] == 'Preço não disponível' or price_info['original_price'] == 'Preço não disponível'):
+                all_price_spans = soup.find_all('span', string=lambda t: t and 'R$' in t)
+                prices_found = []
+                for span in all_price_spans:
+                    price_text = span.get_text(strip=True)
+                    price_match = re.search(r'R\$[\s]*([\d,.]+)', price_text)
+                    if price_match:
+                        value = float(price_match.group(1).replace('.', '').replace(',', '.'))
+                        prices_found.append(value)
+                if prices_found:
+                    if len(prices_found) >= 2:
+                        price_info['original_price'] = max(prices_found)
+                        price_info['current_price'] = min(prices_found)
+                    else:
+                        price_info['current_price'] = prices_found[0]
+                        price_info['original_price'] = prices_found[0]
+                    self.logger.info(f"[DrogaRaiaScraper] Preços encontrados na página do produto: {prices_found}")
+            return brand, price_info, discount_info
         except Exception as e:
-            self.logger.error(f"Erro ao extrair marca da página do produto: {e}")
-        return None 
+            self.logger.error(f"Erro ao extrair marca/preço da página do produto: {e}")
+            return None, None, None 
