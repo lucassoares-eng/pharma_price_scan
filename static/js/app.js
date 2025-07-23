@@ -1077,6 +1077,11 @@ function renderProductsAndChart(products, preservePage = false) {
     if (currentPharmacyFilter && currentPharmacyFilter.trim() !== '') {
         filteredProducts = products.filter(product => product.pharmacy === currentPharmacyFilter);
     }
+    // --- INÍCIO: Filtro por Marca ---
+    if (window.currentBrandFilter && window.currentBrandFilter.trim() !== '') {
+        filteredProducts = filteredProducts.filter(product => product.brand === window.currentBrandFilter);
+    }
+    // --- FIM: Filtro por Marca ---
     
     // Ordenar produtos
     const sortedProducts = getSortedProducts(filteredProducts, currentSort);
@@ -1214,6 +1219,14 @@ function renderProductsAndChart(products, preservePage = false) {
                             <option value="">Todas as farmácias</option>
                         </select>
                     </div>
+                    <!-- INÍCIO: Filtro por Marca -->
+                    <div class="col-md-4">
+                        <label for="brandFilter" class="form-label"><i class="fas fa-filter me-1"></i>Filtrar por Marca</label>
+                        <select id="brandFilter" class="form-select">
+                            <option value="">Todas as marcas</option>
+                        </select>
+                    </div>
+                    <!-- FIM: Filtro por Marca -->
                 </div>
                 <div id="productsList">
                     ${productsHtml}
@@ -1231,6 +1244,12 @@ function renderProductsAndChart(products, preservePage = false) {
         if (!pharmacyFilter || pharmacyFilter.options.length <= 1) {
             setupPharmacyFilter(products);
         }
+        // INÍCIO: Configurar filtro por Marca
+        const brandFilter = document.getElementById('brandFilter');
+        if (!brandFilter || brandFilter.options.length <= 1) {
+            setupBrandFilter(products);
+        }
+        // FIM: Configurar filtro por Marca
     }, 0);
 
     // Atualizar estatísticas e gráfico de preços após a renderização
@@ -1746,3 +1765,129 @@ function downloadExcel() {
         alert('Conteúdo copiado para a área de transferência!');
     }
 } 
+
+// INÍCIO: Função para configurar filtro por Marca
+window.currentBrandFilter = '';
+function setupBrandFilter(products) {
+    // Obter marcas únicas
+    const uniqueBrands = [...new Set(products.map(p => p.brand))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const brandFilter = document.getElementById('brandFilter');
+    
+    // Limpar opções existentes (exceto a primeira)
+    brandFilter.innerHTML = '<option value="">Todas as marcas</option>';
+    
+    // Adicionar opções de marcas
+    uniqueBrands.forEach(brand => {
+        const option = document.createElement('option');
+        option.value = brand;
+        option.textContent = brand;
+        brandFilter.appendChild(option);
+    });
+    
+    // Restaurar valor da variável global se ainda for válido
+    if (window.currentBrandFilter && window.currentBrandFilter.trim() !== '' && uniqueBrands.includes(window.currentBrandFilter)) {
+        brandFilter.value = window.currentBrandFilter;
+        filterProductsByBrand(window.currentBrandFilter, products);
+    }
+    
+    // Adicionar event listener para filtro (só se não existir)
+    const existingListeners = brandFilter.getAttribute('data-has-listener');
+    if (!existingListeners) {
+        brandFilter.addEventListener('change', function() {
+            const selectedBrand = this.value;
+            filterProductsByBrand(selectedBrand, products);
+        });
+        brandFilter.setAttribute('data-has-listener', 'true');
+    }
+}
+function filterProductsByBrand(selectedBrand, allProducts) {
+    // Atualizar filtro global
+    window.currentBrandFilter = selectedBrand;
+    // Resetar página para 1 quando filtro é alterado
+    currentPage = 1;
+    // Se não há filtro aplicado (Todas as marcas), re-renderizar tudo
+    if (!selectedBrand || selectedBrand.trim() === '') {
+        renderProductsAndChart(allProducts);
+        return;
+    }
+    // Re-renderizar apenas a lista de produtos sem re-inicializar componentes
+    const resultsDiv = document.getElementById('results');
+    // Aplicar filtro de marca
+    let filteredProducts = allProducts.filter(product => product.brand === selectedBrand);
+    // Aplicar filtro de farmácia se necessário
+    if (currentPharmacyFilter && currentPharmacyFilter.trim() !== '') {
+        filteredProducts = filteredProducts.filter(product => product.pharmacy === currentPharmacyFilter);
+    }
+    // Ordenar produtos
+    const sortedProducts = getSortedProducts(filteredProducts, currentSort);
+    // Calcular paginação
+    const totalProducts = sortedProducts.length;
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+    // Ajustar página atual se necessário
+    if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+    }
+    // Obter produtos da página atual
+    const startIndex = (currentPage - 1) * productsPerPage;
+    const endIndex = startIndex + productsPerPage;
+    const currentPageProducts = sortedProducts.slice(startIndex, endIndex);
+    // Renderizar produtos da página atual
+    let productsHtml = '';
+    currentPageProducts.forEach(product => {
+        const priceDisplay = typeof product.price === 'number' 
+            ? `R$ ${product.price.toFixed(2).replace('.', ',')}` 
+            : product.price;
+        const originalPriceDisplay = typeof product.original_price === 'number' 
+            ? `R$ ${product.original_price.toFixed(2).replace('.', ',')}` 
+            : product.original_price;
+        productsHtml += `
+            <div class="product-card" data-product-id="${product.name}">
+                <div class="row align-items-center g-2">
+                    <div class="col-2 col-md-1">
+                        <div class="pharmacy-logo">
+                            ${product.pharmacy === 'Droga Raia' ? 
+                                '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
+                                product.pharmacy === 'São João' ?
+                                '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
+                            }
+                        </div>
+                    </div>
+                    <div class="col-7 col-md-6">
+                        <h6 class="fw-bold mb-1 text-truncate">${product.name}</h6>
+                        <span class="brand-badge">${product.brand}</span>
+                        ${product.description ? `<p class="description-text mb-1 d-none d-md-block">${product.description}</p>` : ''}
+                    </div>
+                    <div class="col-3 col-md-5 text-end">
+                        <div class="price">${priceDisplay}</div>
+                        ${product.has_discount ? 
+                            `<div class="original-price">${originalPriceDisplay}</div>
+                             <span class="discount-badge">-${product.discount_percentage}%</span>` : ''
+                        }
+                        ${product.product_url ? 
+                            `<a href="${product.product_url}" target="_blank" class="btn btn-sm btn-outline-primary mt-2 d-none d-md-inline-block">
+                                <i class="fas fa-external-link-alt me-1"></i><span class="d-none d-lg-inline">Ver produto</span>
+                            </a>` : ''
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    // Atualizar apenas a lista de produtos e paginação
+    const productsListContainer = document.getElementById('productsList');
+    if (productsListContainer) {
+        productsListContainer.innerHTML = productsHtml;
+    }
+    // Atualizar paginação
+    const paginationContainer = document.querySelector('.pagination-container');
+    if (paginationContainer) {
+        paginationContainer.outerHTML = renderPagination(totalProducts, currentPage, productsPerPage);
+    }
+    // Atualizar contador de produtos
+    const badge = document.querySelector('.pharmacy-header .badge');
+    if (badge) {
+        badge.innerHTML = `${totalProducts} produtos`;
+    }
+}
+// ... existing code ...
