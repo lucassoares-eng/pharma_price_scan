@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, Blueprint
 from scrapers.droga_raia import DrogaRaiaScraper
 from scrapers.sao_joao import SaoJoaoScraper
+from scrapers.panvel import PanvelScraper
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -247,7 +248,8 @@ def search_medicines():
         
         scrapers = {
             'droga_raia': DrogaRaiaScraper,
-            'sao_joao': SaoJoaoScraper
+            'sao_joao': SaoJoaoScraper,
+            'panvel': PanvelScraper
         }
         results = {}
         with ThreadPoolExecutor(max_workers=len(scrapers)) as executor:
@@ -314,7 +316,8 @@ def search_medicines_unified():
         # Lista de scrapers disponíveis
         scrapers = {
             'droga_raia': DrogaRaiaScraper(driver=driver),
-            'sao_joao': SaoJoaoScraper(driver=driver)
+            'sao_joao': SaoJoaoScraper(driver=driver),
+            'panvel': PanvelScraper(driver=driver)
         }
         
         results = {}
@@ -338,6 +341,8 @@ def search_medicines_unified():
                             scrapers[pharmacy_name] = DrogaRaiaScraper(driver=get_global_driver())
                         elif pharmacy_name == 'sao_joao':
                             scrapers[pharmacy_name] = SaoJoaoScraper(driver=get_global_driver())
+                        elif pharmacy_name == 'panvel':
+                            scrapers[pharmacy_name] = PanvelScraper(driver=get_global_driver())
                         tried_restart = True
                         continue
                     results[pharmacy_name] = {

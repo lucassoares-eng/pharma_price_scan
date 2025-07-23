@@ -372,6 +372,8 @@ function attachSortButtonListeners(products, renderListFn, renderChartFn) {
                                             '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
                                             product.pharmacy === 'São João' ?
                                             '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                            product.pharmacy === 'Panvel' ?
+                                            '<img src="/static/logos/panvel.png" alt="Panvel" title="Panvel" class="logo-img">' :
                                             `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
                                         }
                                     </div>
@@ -895,6 +897,8 @@ async function updatePositionComparison(forceNewAnalysis = false) {
                                 '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img" style="width: 32px; height: 32px;">' :
                                 product.pharmacy === 'São João' ?
                                 '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img" style="width: 32px; height: 32px;">' :
+                                product.pharmacy === 'Panvel' ?
+                                '<img src="/static/logos/panvel.png" alt="Panvel" title="Panvel" class="logo-img">' :
                                 `<i class="fas fa-store logo-icon" style="font-size: 32px; color: #fff;" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
                             }
                         </div>
@@ -1131,6 +1135,8 @@ function renderProductsAndChart(products, preservePage = false) {
                                 '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
                                 product.pharmacy === 'São João' ?
                                 '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                product.pharmacy === 'Panvel' ?
+                                '<img src="/static/logos/panvel.png" alt="Panvel" title="Panvel" class="logo-img">' :
                                 `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
                             }
                         </div>
@@ -1336,6 +1342,8 @@ function filterProductsByPharmacy(selectedPharmacy, allProducts) {
                                 '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
                                 product.pharmacy === 'São João' ?
                                 '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                product.pharmacy === 'Panvel' ?
+                                '<img src="/static/logos/panvel.png" alt="Panvel" title="Panvel" class="logo-img">' :
                                 `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
                             }
                         </div>
@@ -1863,6 +1871,8 @@ function filterProductsByBrand(selectedBrand, allProducts) {
                                 '<img src="/static/logos/raia.png" alt="Raia Drogasil" title="Raia Drogasil" class="logo-img">' :
                                 product.pharmacy === 'São João' ?
                                 '<img src="/static/logos/sao_joao.png" alt="São João" title="São João" class="logo-img">' :
+                                product.pharmacy === 'Panvel' ?
+                                '<img src="/static/logos/panvel.png" alt="Panvel" title="Panvel" class="logo-img">' :
                                 `<i class="fas fa-store logo-icon" title="${product.pharmacy}" aria-label="${product.pharmacy}"></i>`
                             }
                         </div>
