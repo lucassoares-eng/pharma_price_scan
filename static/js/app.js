@@ -24,13 +24,14 @@ window.descontoBadgePlugin = {
         ctx.fillText('Ranking', titleX, titleY);
         ctx.textAlign = 'right';
         ctx.font = titleFont;
-        const descontoTitleX = chart.chartArea.right + (window.innerWidth < 576 ? 38 : 72);
+        const descontoTitleX = chart.chartArea.right + (window.innerWidth < 576 ? 90 : 72);
         ctx.fillText('Desconto', descontoTitleX, titleY);
         ctx.textAlign = 'center';
         ctx.font = titleFont;
-        const precoTitleX = (chart.chartArea.left + chart.chartArea.right) / 2;
+        const precoTitleX = (chart.chartArea.left + chart.chartArea.right) / 2 + (window.innerWidth < 576 ? 18 : 0);
         ctx.fillText('Preço (R$)', precoTitleX, titleY);
         chart.getDatasetMeta(0).data.forEach((bar, i) => {
+            const barStart = chart.scales.x.left;
             const discount = dataset.discounts[i];
             const price = dataset.data[i];
             const position = dataset.positions ? dataset.positions[i] : null;
@@ -45,17 +46,6 @@ window.descontoBadgePlugin = {
                 priceFont = 'bold 11px Segoe UI, Arial';
             }
             ctx.font = priceFont;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            // Centro da barra
-            const barStart = chart.scales.x.left;
-            // const centerX = barStart + (bar.x - barStart) / 2;
-            // let textX = centerX;
-            // let textY = bar.y;
-            // let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
-            // ctx.fillStyle = isSelected ? '#222' : '#fff';
-            // ctx.fillText(priceLabel, textX, textY);
-            // Alinhar à direita da barra
             ctx.textAlign = 'right';
             let textX = bar.x - 6; // 6px de margem à esquerda do final da barra
             let textY = bar.y;
@@ -134,10 +124,12 @@ window.descontoBadgePlugin = {
             // Badges de desconto
             if (discount || (dataset.minDiscounts && dataset.minDiscounts[i] !== null)) {
                 let badgeWidth = 36, badgeHeight = 16, badgeFont = 'bold 10px Segoe UI, Arial';
+                let badgeOffset = window.innerWidth < 576 ? 32 : 12;
                 if (window.innerWidth < 576) {
                     badgeWidth = 22;
                     badgeHeight = 11;
                     badgeFont = 'bold 7px Segoe UI, Arial';
+                    badgeOffset = 44; // mais para a direita em mobile
                 } else if (window.innerWidth < 992) {
                     badgeWidth = 28;
                     badgeHeight = 13;
@@ -152,7 +144,7 @@ window.descontoBadgePlugin = {
                     const maxText = `até -${maxDiscount}%`;
                     const textWidth = ctx.measureText(maxText).width;
                     adjustedBadgeWidth = Math.max(badgeWidth, textWidth + 16);
-                    let x = chart.chartArea.right + 12;
+                    let x = chart.chartArea.right + badgeOffset;
                     ctx.fillStyle = '#dc3545';
                     ctx.beginPath();
                     ctx.moveTo(x + 6, y);
@@ -172,7 +164,7 @@ window.descontoBadgePlugin = {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(maxText, x + adjustedBadgeWidth / 2, y + badgeHeight / 2);
                 } else {
-                    let x = chart.chartArea.right + 12;
+                    let x = chart.chartArea.right + badgeOffset;
                     let y = textY - badgeHeight / 2;
                     ctx.fillStyle = '#dc3545';
                     ctx.beginPath();
