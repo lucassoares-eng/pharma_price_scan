@@ -1443,6 +1443,18 @@ function renderPriceChart(products) {
     lighterGradient.addColorStop(0, '#b3c6f7');
     lighterGradient.addColorStop(1, '#d1b3f7');
 
+    // Calcule o maior valor de preço máximo
+    const maxPriceValue = sortedBrands.length > 0 ? Math.max(...sortedBrands.map(b => b.maxPrice)) : 0;
+    // Defina uma margem maior para mobile
+    const margin = isMobile
+        ? Math.max(maxPriceValue * 0.05, 5)
+        : Math.max(maxPriceValue * 0.03, 2);
+    // Novo valor máximo sugerido
+    let suggestedMax = maxPriceValue + margin;
+    // Arredonde para cima para o próximo múltiplo de 5 ou 10
+    const roundTo = suggestedMax > 50 ? 10 : 5;
+    suggestedMax = Math.ceil(suggestedMax / roundTo) * roundTo;
+
     window.priceChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -1527,6 +1539,7 @@ function renderPriceChart(products) {
                     beginAtZero: true,
                     stacked: true,
                     grid: { display: false },
+                    max: suggestedMax,
                     ticks: {
                         color: '#2d2e4a',
                         font: { size: isMobile ? 8 : fontSize, weight: 'bold' },
