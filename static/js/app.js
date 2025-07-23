@@ -35,7 +35,7 @@ window.descontoBadgePlugin = {
             const price = dataset.data[i];
             const position = dataset.positions ? dataset.positions[i] : null;
             const priceLabel = `R$ ${price.toFixed(2).replace('.', ',')}`;
-            // Fonte do preço mínimo
+            // Fonte do preço mínimo/máximo
             let priceFont = 'bold 12px Segoe UI, Arial';
             if (window.innerWidth < 576) {
                 priceFont = 'bold 8px Segoe UI, Arial';
@@ -55,6 +55,21 @@ window.descontoBadgePlugin = {
             let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
             ctx.fillStyle = isSelected ? '#222' : '#fff';
             ctx.fillText(priceLabel, textX, textY);
+            // Preço máximo dentro da barra, alinhado à direita
+            const chartData = chart.data;
+            let maxPrice = null;
+            if (chartData && chartData.datasets && chartData.datasets[1] && chartData.datasets[1].data) {
+                maxPrice = price + chartData.datasets[1].data[i];
+            }
+            if (maxPrice && maxPrice > price) {
+                let maxLabel = `R$ ${maxPrice.toFixed(2).replace('.', ',')}`;
+                ctx.font = priceFont;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#222';
+                // Alinhar ao final da barra (bar.x)
+                ctx.fillText(maxLabel, bar.x - 6, bar.y);
+            }
             const priceWidth = ctx.measureText(priceLabel).width;
             // Barras verticais de ranking
             if (position) {
@@ -169,44 +184,6 @@ window.descontoBadgePlugin = {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(`-${discount}%`, x + badgeWidth / 2, y + badgeHeight / 2);
                 }
-            }
-            // Preço máximo à direita da barra, ligado visualmente
-            const chartData = chart.data;
-            let maxPrice = null;
-            if (chartData && chartData.datasets && chartData.datasets[1] && chartData.datasets[1].data) {
-                maxPrice = price + chartData.datasets[1].data[i];
-            }
-            if (maxPrice && maxPrice > price) {
-                let maxLabel = `R$ ${maxPrice.toFixed(2).replace('.', ',')}`;
-                let maxFont = 'bold 11px Segoe UI, Arial';
-                if (window.innerWidth < 576) {
-                    maxFont = 'bold 7px Segoe UI, Arial';
-                } else if (window.innerWidth < 992) {
-                    maxFont = 'bold 9px Segoe UI, Arial';
-                } else {
-                    maxFont = 'bold 10px Segoe UI, Arial';
-                }
-                ctx.font = maxFont;
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = '#222';
-                // Desenhar traço ligando o final da barra ao preço máximo
-                let barEnd = bar.x;
-                let xStart = barEnd + 6;
-                let xEnd = chart.chartArea.right + 4;
-                let y = bar.y;
-                ctx.save();
-                ctx.strokeStyle = '#222';
-                ctx.lineWidth = 1.2;
-                ctx.setLineDash([4, 2]);
-                ctx.beginPath();
-                ctx.moveTo(barEnd, y);
-                ctx.lineTo(xEnd, y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
-                // Desenhar o preço máximo
-                ctx.fillText(maxLabel, xEnd + 4, y);
             }
         });
         ctx.restore();
