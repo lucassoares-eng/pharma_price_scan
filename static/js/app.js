@@ -49,6 +49,11 @@ window.descontoBadgePlugin = {
             ctx.textAlign = 'right';
             let textX = bar.x - 6; // 6px de margem à esquerda do final da barra
             let textY = bar.y;
+            if (i === 0 && window.innerWidth >= 576) {
+                textY += 4; // ajuste intermediário para desktop/tablet
+            } else if (i === 0 && window.innerWidth < 576) {
+                textY += 4; // ajuste intermediário para mobile
+            }
             let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
             ctx.fillStyle = isSelected ? '#222' : '#fff';
             ctx.fillText(priceLabel, textX, textY);
