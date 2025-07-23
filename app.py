@@ -25,8 +25,37 @@ def process_pharmacy_results(results, search_term=""):
     
     for pharmacy_name, pharmacy_data in results.items():
         if 'products' in pharmacy_data and pharmacy_data['products']:
-            # Processar produtos de cada farmácia individualmente com o termo de busca
-            processed_products = product_unifier.standardize_product_list(pharmacy_data['products'], search_term)
+            # Filtrar produtos com preço zero antes do processamento
+            valid_products = []
+            for product in pharmacy_data['products']:
+                # Verificar se o preço é válido (não zero e não None)
+                price = product.get('price', 0)
+                
+                # Converter para float se for string
+                try:
+                    if isinstance(price, str):
+                        # Remover caracteres não numéricos e converter
+                        price_clean = price.replace('R$', '').replace(' ', '').replace(',', '.').strip()
+                        price = float(price_clean) if price_clean else 0
+                    elif price is None:
+                        price = 0
+                    else:
+                        price = float(price)
+                except (ValueError, TypeError):
+                    price = 0
+                
+                if price > 0:
+                    # Atualizar o preço no produto para garantir que seja numérico
+                    product['price'] = price
+                    valid_products.append(product)
+                else:
+                    print(f"Produto removido por preço zero: {product.get('name', 'N/A')} - Preço: {price}")
+            
+            # Processar apenas produtos válidos
+            if valid_products:
+                processed_products = product_unifier.standardize_product_list(valid_products, search_term)
+            else:
+                processed_products = []
             
             # Criar resultado processado
             processed_data = pharmacy_data.copy()

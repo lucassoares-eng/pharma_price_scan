@@ -551,7 +551,8 @@ function displayResults(data) {
         <div id="productsList"></div>
     `;
     
-    const results = data.results;
+    // Usar processed_results se disponível, senão usar results
+    const results = data.processed_results || data.results;
     console.log('Results:', results);
     let hasResults = false;
     allProducts = [];

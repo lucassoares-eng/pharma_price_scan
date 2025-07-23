@@ -290,6 +290,7 @@ class ProductUnifier:
                     standardized_product['match_type'] = 'not_found'
                     standardized_product['is_standardized'] = False
                     standardized_product['original_brand'] = product.get('brand', '')
+                    standardized_product['brand'] = product.get('brand', '')  # <-- garantir preservação da marca original
                 
                 # Após atribuição, garantir capitalização correta do brand (exceto EMS)
                 if 'brand' in standardized_product and isinstance(standardized_product['brand'], str) and standardized_product['brand'].strip():
@@ -297,6 +298,13 @@ class ProductUnifier:
                         standardized_product['brand'] = 'EMS'
                     else:
                         standardized_product['brand'] = ' '.join([w.capitalize() for w in standardized_product['brand'].strip().split()])
+
+                # Garantir que brand nunca seja string vazia ou None
+                if not standardized_product.get('brand') or not str(standardized_product.get('brand')).strip():
+                    standardized_product['brand'] = product.get('brand', '') or "Marca não disponível"
+
+                logger.info(f"[DEBUG] Produto '{standardized_product.get('name')}', brand final: '{standardized_product.get('brand')}'")
+
                 standardized_products.append(standardized_product)
                 
             except Exception as e:

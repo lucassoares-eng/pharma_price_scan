@@ -152,30 +152,27 @@ class SaoJoaoScraper(BaseScraper):
             image_url = img_element.get('src', '') if img_element else ""
             # Verificar se há desconto
             discount_info = self._extract_discount_info(section)
-            # --- Lógica de busca condicional ---
-            brand = "Marca não disponível"
+            # --- Lógica de busca da marca ---
+            brand = None
+            
+            # Primeiro, tentar usar o ProductUnifier
             if name and search_term:
-                normalized_name = name.lower().strip()
-                normalized_search = search_term.lower().strip()
-                first_word = normalized_name.split()[0] if normalized_name.split() else ""
                 found_lab = self.product_unifier.find_best_match(
                     product_name=name,
                     product_brand="",
                     product_description=description,
                     search_term=search_term
                 )
-                found_lab_name = found_lab['laboratory'] if found_lab and found_lab.get('laboratory') else ""
-                if first_word == normalized_search.split()[0] and not found_lab_name:
-                    # Buscar página específica
-                    brand = self._extract_brand_from_product_page(product_link)
-                else:
-                    # Não buscar página específica, usar resultado do unifier se houver
-                    brand = found_lab_name or None
-            else:
-                brand = None if brand == "Marca não disponível" else brand
-            # Se brand ainda for None, buscar na página específica do produto
+                if found_lab and found_lab.get('laboratory'):
+                    brand = found_lab['laboratory']
+            
+            # Se não encontrou com ProductUnifier, buscar na página específica
             if not brand and product_link:
                 brand = self._extract_brand_from_product_page(product_link)
+            
+            # Se ainda não encontrou, usar "Marca não disponível"
+            if not brand:
+                brand = "Marca não disponível"
             product_data = {
                 'name': name,
                 'brand': brand,
@@ -195,6 +192,14 @@ class SaoJoaoScraper(BaseScraper):
                 else:
                     brand_value = ' '.join([w.capitalize() for w in brand_value.strip().split()])
             product_data['brand'] = brand_value
+
+            # Logar valor final de brand
+            self.logger.info(f"[DEBUG] Valor final de brand para '{name}': '{product_data['brand']}'")
+
+            # Garantir que brand nunca seja string vazia
+            if not product_data['brand'] or not str(product_data['brand']).strip():
+                product_data['brand'] = "Marca não disponível"
+
             return product_data
         except Exception as e:
             self.logger.error(f"Erro ao extrair informações do produto: {e}")
@@ -336,17 +341,22 @@ class SaoJoaoScraper(BaseScraper):
                 "span[class*='brand']",
                 ".vtex-product-identifier-0-x-product-identifier__value",
                 "span[class*='manufacturer']",
-                ".vtex-product-identifier-0-x-product-identifier__value"
+                ".vtex-product-identifier-0-x-product-identifier__value",
+                # Adicionar mais seletores genéricos
+                "[class*='brand']",
+                "[class*='manufacturer']",
+                "[class*='productBrand']"
             ]
             
             for selector in brand_selectors:
                 try:
                     brand_element = self.driver.find_element(By.CSS_SELECTOR, selector)
                     brand_text = brand_element.text.strip()
-                    if brand_text:
+                    if brand_text and len(brand_text) > 1:
                         self.logger.info(f"Marca encontrada com seletor '{selector}': {brand_text}")
                         return brand_text
-                except Exception:
+                except Exception as e:
+                    self.logger.debug(f"Seletor '{selector}' não encontrado: {e}")
                     continue
             
             # Tentar com XPath também
@@ -355,17 +365,20 @@ class SaoJoaoScraper(BaseScraper):
                 "//span[contains(@class, 'brand')]",
                 "//span[contains(@class, 'manufacturer')]",
                 "//div[contains(@class, 'productBrandName')]",
-                "//div[contains(@class, 'brand')]"
+                "//div[contains(@class, 'brand')]",
+                "//*[contains(@class, 'brand')]",
+                "//*[contains(@class, 'manufacturer')]"
             ]
             
             for xpath in xpath_selectors:
                 try:
                     brand_element = self.driver.find_element(By.XPATH, xpath)
                     brand_text = brand_element.text.strip()
-                    if brand_text:
+                    if brand_text and len(brand_text) > 1:
                         self.logger.info(f"Marca encontrada com XPath '{xpath}': {brand_text}")
                         return brand_text
-                except Exception:
+                except Exception as e:
+                    self.logger.debug(f"XPath '{xpath}' não encontrado: {e}")
                     continue
             
             # Se não encontrar com seletores específicos, tentar extrair do título da página
@@ -379,9 +392,25 @@ class SaoJoaoScraper(BaseScraper):
                         if brand_text and len(brand_text) > 2:
                             self.logger.info(f"Marca extraída do título: {brand_text}")
                             return brand_text
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Erro ao extrair marca do título: {e}")
             
+            # Tentar extrair do URL da página
+            try:
+                current_url = self.driver.current_url
+                if current_url:
+                    # Tentar extrair marca do URL
+                    url_parts = current_url.split('/')
+                    for part in url_parts:
+                        if part and len(part) > 2 and not part.startswith('http'):
+                            # Verificar se parece ser uma marca
+                            if not any(char.isdigit() for char in part) and part not in ['www', 'com', 'br', 'farmacias']:
+                                self.logger.info(f"Marca extraída do URL: {part}")
+                                return part
+            except Exception as e:
+                self.logger.debug(f"Erro ao extrair marca do URL: {e}")
+            
+            self.logger.warning("Nenhuma marca encontrada na página do produto")
             return "Marca não disponível"
             
         except Exception as e:

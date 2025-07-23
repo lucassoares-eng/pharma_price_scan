@@ -66,6 +66,12 @@ class DrogaRaiaScraper(BaseScraper):
         Extrai informações de um produto do HTML
         """
         try:
+            # Verificar se o produto tem "Consultar disponibilidade" - se sim, excluir
+            availability_span = article.find('span', class_='sc-ddb3b127-0 RTDNF')
+            if availability_span and 'Consultar disponibilidade' in availability_span.get_text(strip=True):
+                self.logger.info(f"[DrogaRaiaScraper] Produto excluído - 'Consultar disponibilidade' encontrado")
+                return None
+            
             # Nome do produto
             name_element = article.find('h2', class_=lambda x: x and 'eGzxuI' in x)
             if name_element:
