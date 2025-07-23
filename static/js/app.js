@@ -15,7 +15,8 @@ window.descontoBadgePlugin = {
         ctx.save();
         
         // Desenhar título "★ Ranking" em cima das estrelas
-        ctx.font = 'bold 12px Segoe UI, Arial';
+        let titleFont = window.innerWidth < 576 ? 'bold 9px Segoe UI, Arial' : 'bold 12px Segoe UI, Arial';
+        ctx.font = titleFont;
         ctx.fillStyle = '#495057';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
@@ -24,12 +25,12 @@ window.descontoBadgePlugin = {
         ctx.fillText('Ranking', titleX, titleY);
         // Desenhar título "Desconto" acima dos badges de desconto
         ctx.textAlign = 'right';
-        ctx.font = 'bold 12px Segoe UI, Arial';
-        const descontoTitleX = chart.chartArea.right + 72; // ainda mais para a direita
+        ctx.font = titleFont;
+        const descontoTitleX = chart.chartArea.right + (window.innerWidth < 576 ? 38 : 72);
         ctx.fillText('Desconto', descontoTitleX, titleY);
         // Desenhar título "Preço (R$)" centralizado acima do gráfico
         ctx.textAlign = 'center';
-        ctx.font = 'bold 12px Segoe UI, Arial';
+        ctx.font = titleFont;
         const precoTitleX = (chart.chartArea.left + chart.chartArea.right) / 2;
         ctx.fillText('Preço (R$)', precoTitleX, titleY);
         chart.getDatasetMeta(0).data.forEach((bar, i) => {
@@ -1507,7 +1508,7 @@ function renderPriceChart(products) {
                     top: isMobile ? 2 : 20,
                     bottom: isMobile ? 2 : 20,
                     left: isMobile ? 6 : 10,
-                    right: isMobile ? 60 : 90 // Adiciona espaço à direita para os badges
+                    right: isMobile ? 90 : 90 // Mais espaço à direita para os badges no mobile
                 }
             },
             plugins: {
@@ -1544,7 +1545,9 @@ function renderPriceChart(products) {
                     grid: { display: false },
                     ticks: {
                         color: '#2d2e4a',
-                        font: { size: fontSize, weight: 'bold' }
+                        font: { size: isMobile ? 8 : fontSize, weight: 'bold' },
+                        maxTicksLimit: isMobile ? 6 : undefined,
+                        stepSize: isMobile ? 10 : undefined
                     }
                 },
                 y: {
