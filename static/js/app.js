@@ -61,14 +61,16 @@ window.descontoBadgePlugin = {
             if (chartData && chartData.datasets && chartData.datasets[1] && chartData.datasets[1].data) {
                 maxPrice = price + chartData.datasets[1].data[i];
             }
-            if (maxPrice && maxPrice > price) {
+            // Ajuste: alinhar ao final da barra de maior preço (usando a posição do segundo dataset)
+            const metaMax = chart.getDatasetMeta(1); // meta do segundo dataset (diferença até o máximo)
+            if (maxPrice && maxPrice > price && metaMax && metaMax.data && metaMax.data[i]) {
                 let maxLabel = `R$ ${maxPrice.toFixed(2).replace('.', ',')}`;
                 ctx.font = priceFont;
-                ctx.textAlign = 'right';
+                ctx.textAlign = 'left';
                 ctx.textBaseline = 'middle';
                 ctx.fillStyle = '#222';
-                // Alinhar ao final da barra (bar.x)
-                ctx.fillText(maxLabel, bar.x - 6, bar.y);
+                // Alinhar ao lado externo direito da barra de maior preço
+                ctx.fillText(maxLabel, metaMax.data[i].x + 6, metaMax.data[i].y);
             }
             const priceWidth = ctx.measureText(priceLabel).width;
             // Barras verticais de ranking
