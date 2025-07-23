@@ -56,7 +56,12 @@ window.descontoBadgePlugin = {
                 textY += 4; // ajuste intermediário para mobile
             }
             let isSelected = window.selectedProduct && chart.data.labels[i] === window.selectedProduct.brand;
-            ctx.fillStyle = isSelected ? '#222' : '#fff';
+            // Se o texto está colado no minX, significa que a barra é pequena
+            if (textX === minX) {
+                ctx.fillStyle = '#39FF14'; // verde claro fluorescente
+            } else {
+                ctx.fillStyle = isSelected ? '#222' : '#fff';
+            }
             ctx.fillText(priceLabel, textX, textY);
             // Preço máximo dentro da barra, alinhado à direita
             const chartData = chart.data;
