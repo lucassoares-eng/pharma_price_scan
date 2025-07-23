@@ -132,19 +132,15 @@ window.descontoBadgePlugin = {
                 
                 if (hasMultipleDiscounts) {
                     // Badge único com maior desconto
-                    let x = textX + priceWidth / 2 + 8;
+                    let adjustedBadgeWidth;
                     let y = textY - badgeHeight / 2;
-                    
                     // Calcular texto com "até"
                     const maxText = `até -${maxDiscount}%`;
-                    
                     // Ajustar largura do badge baseado no texto
                     const textWidth = ctx.measureText(maxText).width;
-                    const adjustedBadgeWidth = Math.max(badgeWidth, textWidth + 16);
-                    
-                    if (x + adjustedBadgeWidth > chart.chartArea.right - 8) {
-                        x = chart.chartArea.right - adjustedBadgeWidth - 8;
-                    }
+                    adjustedBadgeWidth = Math.max(badgeWidth, textWidth + 16);
+                    // Alinhar badge à direita do gráfico
+                    let x = chart.chartArea.right - adjustedBadgeWidth - 8;
                     
                     // Desenhar badge
                     ctx.fillStyle = '#dc3545';
@@ -170,11 +166,8 @@ window.descontoBadgePlugin = {
                     
                 } else {
                     // Badge único (comportamento original)
-                    let x = textX + priceWidth / 2 + 8;
+                    let x = chart.chartArea.right - badgeWidth - 8;
                     let y = textY - badgeHeight / 2;
-                    if (x + badgeWidth > chart.chartArea.right - 8) {
-                        x = chart.chartArea.right - badgeWidth - 8;
-                    }
                     ctx.fillStyle = '#dc3545';
                     ctx.beginPath();
                     ctx.moveTo(x + 6, y);
@@ -705,13 +698,17 @@ function updatePriceChart() {
         const sortedBrands = Object.entries(brandData)
             .map(([brand, data]) => ({
                 brand: brand,
-                avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
-                count: data.prices.length
+                minPrice: Math.min(...data.prices),
+                count: data.prices.length,
+                maxDiscount: Math.max(...data.prices) - Math.min(...data.prices),
+                minDiscount: Math.min(...data.prices),
+                hasMultipleDiscounts: Math.max(...data.prices) !== Math.min(...data.prices),
+                minPosition: Math.min(...allProducts.filter(p => p.brand === brand).map(p => p.position ?? Infinity))
             }))
-            .sort((a, b) => a.avgPrice - b.avgPrice);
+            .sort((a, b) => a.minPrice - b.minPrice);
         
         priceChart.data.labels = sortedBrands.map(b => b.brand);
-        priceChart.data.datasets[0].data = sortedBrands.map(b => b.avgPrice);
+        priceChart.data.datasets[0].data = sortedBrands.map(b => b.minPrice);
         priceChart.data.datasets[0].backgroundColor = sortedBrands.map(b => 
             selectedProduct && b.brand === selectedProduct.brand ? '#1e3a8a' : 
             selectedProduct ? '#a8b4e6' : '#667eea'
@@ -1411,10 +1408,11 @@ function renderPriceChart(products) {
             const discounts = brandProducts.map(p => p.discount_percentage || 0);
             const maxDiscount = discounts.length > 0 ? Math.max(...discounts) : 0;
             const minDiscount = discounts.length > 0 ? Math.min(...discounts) : 0;
-            
+            // Calcular o preço mínimo da marca
+            const minPrice = Math.min(...data.prices);
             return {
                 brand: brand,
-                avgPrice: data.prices.reduce((a, b) => a + b, 0) / data.prices.length,
+                minPrice: minPrice,
                 count: data.prices.length,
                 maxDiscount: maxDiscount,
                 minDiscount: minDiscount,
@@ -1423,9 +1421,9 @@ function renderPriceChart(products) {
             };
         });
     if (currentSort === 'menor_preco') {
-        sortedBrands.sort((a, b) => a.avgPrice - b.avgPrice);
+        sortedBrands.sort((a, b) => a.minPrice - b.minPrice);
     } else if (currentSort === 'maior_preco') {
-        sortedBrands.sort((a, b) => b.avgPrice - a.avgPrice);
+        sortedBrands.sort((a, b) => b.minPrice - a.minPrice);
     } else if (currentSort === 'maior_desconto') {
         sortedBrands.sort((a, b) => b.maxDiscount - a.maxDiscount);
     } else { // relevancia
@@ -1470,8 +1468,8 @@ function renderPriceChart(products) {
         data: {
             labels: sortedBrands.map(b => b.brand),
             datasets: [{
-                label: 'Preço Médio (R$)',
-                data: sortedBrands.map(b => b.avgPrice),
+                label: 'Preço Mínimo (R$)',
+                data: sortedBrands.map(b => b.minPrice),
                 backgroundColor: sortedBrands.map(_ => gradient),
                 borderColor: 'rgba(102,126,234,0.18)',
                 borderWidth: 1.5,

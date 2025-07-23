@@ -91,7 +91,7 @@ body {
     background: linear-gradient(135deg, #f8fafc 0%, #e9eafc 100%);
     border-radius: 22px;
     box-shadow: 0 8px 32px rgba(102, 126, 234, 0.10), 0 1.5px 6px rgba(118, 75, 162, 0.08);
-    padding: 1.5rem 1.5rem 1.2rem 1.5rem;
+    padding: 1.5rem 1.5rem 1.2rem 0.5rem; /* Reduzido o padding à esquerda */
     margin-bottom: 2rem;
     border: 1.5px solid #e3e8f7;
 }
@@ -526,6 +526,7 @@ body {
     position: relative;
     height: 200px;
     margin-bottom: 1rem;
+    text-align: left; /* Garante alinhamento à esquerda */
 }
 
 @media (min-width: 768px) {
